@@ -13,20 +13,9 @@ from docx import Document
 logger = logging.getLogger("privateproxy.parsers.docx")
 
 
-def parse_docx(file_path: Path) -> str:
+def parse_docx(file_path: Path) -> dict[str, Any]:
     """
-    Extract all text from a DOCX file.
-
-    Extracts text from:
-    - Paragraphs (body text)
-    - Tables (cell content)
-    - Headers and footers
-
-    Args:
-        file_path: Path to the .docx file.
-
-    Returns:
-        Full text content of the document as a single string.
+    Extract text and structure from a DOCX file.
     """
     doc = Document(str(file_path))
     parts: list[str] = []
@@ -66,4 +55,10 @@ def parse_docx(file_path: Path) -> str:
 
     full_text = "\n".join(parts)
     logger.info(f"Parsed DOCX: {file_path.name} — {len(parts)} text blocks, {len(full_text)} chars")
-    return full_text
+    return {
+        "text": full_text,
+        "preview_data": {
+            "type": "document",
+            "text": full_text
+        }
+    }

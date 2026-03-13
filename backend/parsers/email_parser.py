@@ -14,26 +14,26 @@ from typing import Optional
 logger = logging.getLogger("privateproxy.parsers.email")
 
 
-def parse_email(file_path: Path) -> str:
+def parse_email(file_path: Path) -> dict[str, Any]:
     """
     Extract text from an email file (.eml or .msg).
-
-    Extracts: subject, sender, recipients, date, and body text.
-
-    Args:
-        file_path: Path to the .eml or .msg file.
-
-    Returns:
-        Full text content of the email.
     """
     ext = file_path.suffix.lower()
 
     if ext == ".msg":
-        return _parse_msg(file_path)
+        text = _parse_msg(file_path)
     elif ext == ".eml":
-        return _parse_eml(file_path)
+        text = _parse_eml(file_path)
     else:
         raise ValueError(f"Unsupported email format: {ext}")
+    
+    return {
+        "text": text,
+        "preview_data": {
+            "type": "email",
+            "text": text
+        }
+    }
 
 
 def _parse_eml(file_path: Path) -> str:

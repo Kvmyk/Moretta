@@ -21,12 +21,20 @@ interface PiiResult {
   file_id: string;
   filename: string;
   total_pii: number;
+  deep_scan_completed?: boolean;
   types: PiiType[];
+}
+
+interface PreviewData {
+  type: 'spreadsheet' | 'document' | 'email';
+  text?: string;
+  sheets?: { name: string; rows: string[][] }[];
 }
 
 interface PreviewResult {
   file_id: string;
   anonymized_text: string;
+  preview_data: PreviewData;
   tokens_used: number;
 }
 
@@ -42,7 +50,7 @@ function NewTask() {
   // Chat steps state
   const [step, setStep] = useState<'input' | 'pii_detected' | 'processing' | 'done'>('input');
   
-  // Input states
+  const [chatInput, setChatInput] = useState('');
   const [inputText, setInputText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
@@ -54,9 +62,57 @@ function NewTask() {
   // Task states
   const [taskId, setTaskId] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<string | null>(null);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const handleFileAction = useCallback((file: File) => {
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    const allowed = ['.docx', '.xlsx', '.eml', '.msg', '.txt'];
+    if (allowed.includes(ext)) {
+      setSelectedFile(file);
+      setStep('input');
+      setFileId(null);
+      setTaskId(null);
+      setTaskStatus(null);
+      setSecurityError(null);
+      setInstruction('');
+      setInputText('');
+    }
+  }, []);
+
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileAction(file);
+    }
+  }, [handleFileAction]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +156,10 @@ function NewTask() {
       return res.json();
     },
     enabled: !!fileId,
+    refetchInterval: (query) => {
+      // Poll every 3 seconds if we have data and deep scan is NOT completed
+      return query.state.data?.deep_scan_completed !== false ? false : 3000;
+    },
   });
 
   // Fetch preview for text inputs
@@ -110,18 +170,47 @@ function NewTask() {
       if (!res.ok) throw new Error('Failed to fetch preview');
       return res.json();
     },
-    enabled: !!fileId && !selectedFile,
+    enabled: !!fileId,
+    refetchInterval: () => {
+      return piiQuery.data?.deep_scan_completed !== false ? false : 3000;
+    },
   });
 
-  // Fetch final result for text (only when done and not a file)
-  const resultQuery = useQuery<{ result_text: string }>({
+  // Fetch final result returning chat messages
+  const resultQuery = useQuery<{ task_id: string; status: string; filename: string; messages: Array<{role: string, content: string}>; has_solution?: boolean; result_preview?: any }>({
     queryKey: ['result', taskId],
     queryFn: async () => {
       const res = await fetch(`/api/task/${taskId}/result`);
       if (!res.ok) throw new Error('Result fetch failed');
       return res.json();
     },
-    enabled: !!taskId && taskStatus === 'completed' && !selectedFile,
+    enabled: !!taskId && taskStatus === 'completed',
+  });
+
+  // Chat mutation for multi-turn
+  const sendChatMutation = useMutation({
+    mutationFn: async (chatInstruction: string) => {
+      const res = await fetch(`/api/task/${taskId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction: chatInstruction }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Chat failed');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setSecurityError(null);
+      setTaskStatus('processing');
+      setStep('processing');
+      setChatInput('');
+      pollTaskStatus(taskId!);
+    },
+    onError: (error: Error) => {
+      setSecurityError(error.message);
+    }
   });
 
   useEffect(() => {
@@ -141,15 +230,22 @@ function NewTask() {
           model,
         }),
       });
-      if (!res.ok) throw new Error('Task creation failed');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Task creation failed');
+      }
       return res.json() as Promise<TaskResult>;
     },
     onSuccess: (data) => {
+      setSecurityError(null);
       setTaskId(data.task_id);
       setTaskStatus('processing');
       setStep('processing');
       pollTaskStatus(data.task_id);
     },
+    onError: (error: Error) => {
+      setSecurityError(error.message);
+    }
   });
 
   // Poll task status
@@ -214,6 +310,8 @@ function NewTask() {
     setInstruction('');
     setTaskId(null);
     setTaskStatus(null);
+    setSecurityError(null);
+    setChatInput('');
   };
 
   const formatFileSize = (bytes: number) => {
@@ -221,9 +319,69 @@ function NewTask() {
     return `${Math.round(bytes / 1024)} KB`;
   };
 
+  const renderRichPreview = (preview: PreviewResult) => {
+    const data = preview.preview_data;
+    if (!data || data.type === 'document' || data.type === 'email') {
+      return (
+        <div className="bg-pp-bg rounded-xl border border-pp-border/50 p-4 mt-4 max-h-[400px] overflow-y-auto">
+          <h5 className="text-xs font-semibold text-pp-text-muted flex items-center gap-2 mb-2">
+            PODGLĄD TEKSTU WYSYŁANEGO DO AI (ZAAOONIMIZOWANY)
+          </h5>
+          <div className="text-sm font-mono text-pp-text break-words whitespace-pre-wrap leading-relaxed">
+            {renderHighlightedText(data?.text || preview.anonymized_text)}
+          </div>
+        </div>
+      );
+    }
+
+    if (data.type === 'spreadsheet') {
+      return (
+        <div className="mt-4 space-y-4">
+           <h5 className="text-xs font-semibold text-pp-text-muted flex items-center gap-2">
+             WIZUALIZACJA ARKUSZA (ZAKRYTE DANE WRAŻLIWE)
+           </h5>
+           <div className="overflow-x-auto border border-pp-border rounded-xl bg-pp-bg shadow-inner max-h-[400px] overflow-y-auto custom-scrollbar">
+            {data.sheets?.map((sheet, sIdx) => (
+              <div key={sIdx} className="mb-0 last:mb-0">
+                <div className="bg-white/5 px-4 py-2 text-xs font-bold text-pp-accent border-b border-pp-border flex items-center gap-2 sticky top-0 z-10 backdrop-blur-md">
+                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                   </svg>
+                   {sheet.name}
+                </div>
+                <div className="min-w-full inline-block align-middle">
+                  <table className="min-w-full text-xs text-left border-collapse table-fixed">
+                    <thead>
+                      <tr className="bg-white/5 font-bold text-pp-text-muted/50 border-b border-pp-border">
+                        <th className="w-10 p-2 border-r border-pp-border text-center">#</th>
+                        {sheet.rows[0]?.map((_, i) => (
+                          <th key={i} className="p-2 border-r border-pp-border last:border-0 w-32 uppercase tracking-wider">{String.fromCharCode(65 + i)}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sheet.rows.map((row, rIdx) => (
+                        <tr key={rIdx} className="border-b border-pp-border/50 last:border-0 hover:bg-pp-accent/5 transition-colors">
+                          <td className="p-2 border-r border-pp-border bg-white/5 text-center font-mono text-[10px] text-pp-text-muted">{rIdx + 1}</td>
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx} className="p-2 border-r border-pp-border/50 last:border-0 align-top">
+                              <span className="break-words line-clamp-3 hover:line-clamp-none transition-all">{renderHighlightedText(cell)}</span>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+  };
+
   const renderHighlightedText = (text: string) => {
-    // Rozdzielanie po tokenach zaczynających się od [ i kończących się na ] 
-    // z alfanumerycznym ID i ew. typem, np: [PERSON_1a2b] lub [DATA_123]
     const parts = text.split(/(\[[A-Z0-9_]+_[a-f0-9]+\])/g);
     return parts.map((part, idx) => {
       if (part.match(/^\[[A-Z0-9_]+_[a-f0-9]+\]$/)) {
@@ -238,7 +396,26 @@ function NewTask() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-2rem)]">
+    <div 
+      className="flex flex-col h-[calc(100vh-2rem)] relative"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-pp-bg/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200 pointer-events-none">
+          <div className="border-2 border-dashed border-pp-accent rounded-3xl p-12 flex flex-col items-center gap-4 bg-pp-surface shadow-2xl">
+            <div className="w-20 h-20 rounded-2xl bg-pp-accent/10 flex items-center justify-center text-pp-accent">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <p className="text-xl font-bold text-white uppercase tracking-wider">Upuść plik, aby przesłać</p>
+            <p className="text-pp-text-muted">Obsługiwane formaty: DOCX, XLSX, EML, MSG, TXT</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-6 px-8 py-4 bg-pp-surface rounded-xl border border-pp-border">
         <div>
@@ -330,20 +507,20 @@ function NewTask() {
                 <div className="space-y-4">
                   <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-4 shadow-sm">
                     <p className="text-sm text-pp-text mb-4">
-                      Zakończyłem skanowanie. Znalazłem {piiQuery.data.total_pii} wrażliwych fragmentów, które zostały ukryte pod tokenami, zanim cokolwiek wyślę do sztucznej inteligencji.
+                      {piiQuery.data.deep_scan_completed === false 
+                        ? 'Wykonuję wstępne skanowanie. Za chwilę uruchomię głęboką analizę (Ollama), poczekaj na wynik przed wysłaniem do AI.'
+                        : `Skanowanie zakończone. Znalazłem ${piiQuery.data.total_pii} wrażliwych fragmentów, które zostały bezpiecznie zanonimizowane.`}
                     </p>
                     <div className="bg-pp-bg rounded-xl border border-pp-border/50 p-3">
                       <PiiDetectionCard types={piiQuery.data.types} />
                     </div>
 
-                    {!selectedFile && previewQuery.data && (
-                      <div className="bg-pp-bg rounded-xl border border-pp-border/50 p-4 mt-4">
-                        <h5 className="text-xs font-semibold text-pp-text-muted flex items-center gap-2 mb-2">
-                          PODGLĄD TEKSTU WYSYŁANEGO DO AI (ZAAOONIMIZOWANY)
-                        </h5>
-                        <p className="text-sm font-mono text-pp-text break-words whitespace-pre-wrap leading-relaxed">
-                          {renderHighlightedText(previewQuery.data.anonymized_text)}
-                        </p>
+                    {previewQuery.data && renderRichPreview(previewQuery.data)}
+
+                    {piiQuery.data.deep_scan_completed === false && (
+                      <div className="flex items-center gap-3 mt-4 text-pp-text-muted bg-pp-bg/50 px-4 py-2 rounded-lg border border-pp-border/50">
+                        <div className="w-3 h-3 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-medium">Skanowanie głębokie w toku (lokalny LLM)...</span>
                       </div>
                     )}
                   </div>
@@ -351,18 +528,19 @@ function NewTask() {
                   {step === 'pii_detected' && (
                     <div className="bg-pp-surface border border-pp-border rounded-2xl p-4 shadow-sm animate-in fade-in">
                       <label className="block text-sm font-medium text-pp-text mb-2">
-                        Co AI ma zrobić z tym tekstem?
+                        Instrukcja dla AI
                       </label>
                       <textarea
                         value={instruction}
                         onChange={(e) => setInstruction(e.target.value)}
-                        placeholder="Napisz instrukcję, np. Przetłumacz na angielski... (opcjonalnie)"
-                        className="w-full h-24 bg-pp-bg border border-pp-border rounded-xl px-4 py-3 text-sm text-white placeholder-pp-text-muted/50 resize-none focus:outline-none focus:border-pp-accent transition-colors mb-4"
+                        disabled={piiQuery.data.deep_scan_completed === false}
+                        placeholder={piiQuery.data.deep_scan_completed === false ? "Poczekaj na zakończenie skanowania..." : "Napisz instrukcję dla AI..."}
+                        className="w-full h-24 bg-pp-bg border border-pp-border rounded-xl px-4 py-3 text-sm text-white placeholder-pp-text-muted/50 resize-none focus:outline-none focus:border-pp-accent transition-colors mb-4 disabled:opacity-50"
                       />
                       <div className="flex justify-end">
                         <button
                           onClick={handleSendToAI}
-                          disabled={createTaskMutation.isPending}
+                          disabled={createTaskMutation.isPending || piiQuery.data.deep_scan_completed === false}
                           className="px-6 py-2.5 bg-pp-accent hover:bg-pp-accent-light text-white text-sm font-medium rounded-xl transition-all shadow-md shadow-pp-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                           {createTaskMutation.isPending ? 'Wysyłanie...' : 'Wyślij do AI'}
@@ -371,34 +549,146 @@ function NewTask() {
                           </svg>
                         </button>
                       </div>
+                      {securityError && (
+                        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3 items-start">
+                          <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <p className="text-sm text-red-400">{securityError}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="bg-pp-surface border border-red-900/50 rounded-2xl rounded-tl-sm p-4 text-sm text-red-500">
-                  Wystąpił błąd podczas analizy PII.
+                  Wystąpił błąd podczas analizy.
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* User Instruction Bubble */}
-        {(step === 'processing' || step === 'done') && instruction && (
-          <div className="flex gap-4 flex-row-reverse animate-in fade-in slide-in-from-bottom-4">
-             <div className="w-8 h-8 rounded-full bg-pp-bg border border-pp-border flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-pp-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div className="bg-pp-accent text-white rounded-2xl rounded-tr-sm p-4 max-w-2xl shadow-lg">
-              <p className="text-sm whitespace-pre-wrap">{instruction}</p>
-            </div>
-          </div>
-        )}
+        {/* Chat Thread Messages */}
+        {resultQuery.data?.messages.map((msg, idx) => {
+          const hasSolution = resultQuery.data?.has_solution;
+          const resultPreview = resultQuery.data?.result_preview;
+          // Show result card for the latest assistant message when a solution exists
+          const isLastAssistant = msg.role === 'assistant' && 
+            idx === resultQuery.data!.messages.length - 1 && 
+            hasSolution;
 
-        {/* Final Result Bubble */}
-        {(step === 'processing' || step === 'done') && (
+          return (
+            <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in fade-in slide-in-from-bottom-2`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                msg.role === 'user' ? 'bg-pp-bg border border-pp-border' : 'bg-pp-accent'
+              }`}>
+                 {msg.role === 'user' ? (
+                   <svg className="w-4 h-4 text-pp-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                   </svg>
+                 ) : (
+                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.989-2.386l-.548-.547z" />
+                   </svg>
+                 )}
+              </div>
+              <div className={`rounded-2xl p-4 max-w-2xl shadow-sm ${
+                msg.role === 'user' ? 'bg-pp-accent rounded-tr-sm text-white' : 'bg-pp-surface border border-pp-border rounded-tl-sm text-pp-text'
+              }`}>
+                {isLastAssistant ? (
+                  <div className="space-y-4">
+                    {/* Chat message from AI */}
+                    <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    
+                    {/* Result Preview */}
+                    {resultPreview && (
+                      <div className="border-t border-pp-border pt-4">
+                        <h5 className="text-xs font-semibold text-pp-accent flex items-center gap-2 mb-3 uppercase tracking-widest">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Podgląd wyniku
+                        </h5>
+                        {resultPreview.type === 'spreadsheet' && resultPreview.sheets ? (
+                          <div className="overflow-x-auto border border-pp-border rounded-xl bg-pp-bg shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar">
+                            {resultPreview.sheets.map((sheet: any, sIdx: number) => (
+                              <div key={sIdx} className="mb-0 last:mb-0">
+                                <div className="bg-white/5 px-4 py-2 text-xs font-bold text-pp-accent border-b border-pp-border flex items-center gap-2 sticky top-0 z-10 backdrop-blur-md">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  {sheet.name}
+                                </div>
+                                <div className="min-w-full inline-block align-middle">
+                                  <table className="min-w-full text-xs text-left border-collapse table-fixed">
+                                    <thead>
+                                      <tr className="bg-white/5 font-bold text-pp-text-muted/50 border-b border-pp-border">
+                                        <th className="w-10 p-2 border-r border-pp-border text-center">#</th>
+                                        {sheet.rows[0]?.map((_: any, i: number) => (
+                                          <th key={i} className="p-2 border-r border-pp-border last:border-0 w-32 uppercase tracking-wider">{String.fromCharCode(65 + i)}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sheet.rows.map((row: string[], rIdx: number) => (
+                                        <tr key={rIdx} className="border-b border-pp-border/50 last:border-0 hover:bg-pp-accent/5 transition-colors">
+                                          <td className="p-2 border-r border-pp-border bg-white/5 text-center font-mono text-[10px] text-pp-text-muted">{rIdx + 1}</td>
+                                          {row.map((cell: string, cIdx: number) => (
+                                            <td key={cIdx} className="p-2 border-r border-pp-border/50 last:border-0 align-top">
+                                              <span className="break-words line-clamp-3 hover:line-clamp-none transition-all">{cell}</span>
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : resultPreview.type === 'document' ? (
+                          <div className="bg-pp-bg rounded-xl border border-pp-border/50 p-4 max-h-[300px] overflow-y-auto">
+                            <div className="text-sm font-mono text-pp-text break-words whitespace-pre-wrap leading-relaxed">
+                              {resultPreview.text}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Download Button */}
+                    <div className="bg-pp-bg border border-pp-border rounded-xl p-4 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-pp-accent/10 flex items-center justify-center text-pp-accent">
+                        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-sm font-semibold truncate text-white">{filename || 'Wynik'}</p>
+                        <p className="text-xs text-pp-text-muted">Gotowy do pobrania</p>
+                      </div>
+                      <button 
+                        onClick={handleDownloadResult}
+                        className="bg-pp-accent hover:bg-pp-accent-light text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg"
+                      >
+                        POBIERZ
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">
+                    {msg.content}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Processing State Bubble */}
+        {taskStatus === 'processing' && (
            <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4">
             <div className="w-8 h-8 rounded-full bg-pp-accent flex items-center justify-center shrink-0">
                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -406,64 +696,12 @@ function NewTask() {
               </svg>
             </div>
             <div className="max-w-2xl w-full">
-              {taskStatus === 'processing' ? (
-                <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm text-pp-text-muted">Czekam na odpowiedź wybranego modelu AI...</span>
-                  </div>
+              <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-4 text-pp-text shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-pp-text-muted">Czekam na odpowiedź AI...</span>
                 </div>
-              ) : taskStatus === 'completed' ? (
-                <div className="bg-pp-bg border border-pp-accent/50 rounded-2xl rounded-tl-sm p-5 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-white mb-1">Zadanie ukończone!</h4>
-                      <p className="text-xs text-pp-text-muted">
-                        Dane z powrotem podmienione na oryginalne PII.
-                        {selectedFile ? ' Możesz pobrać wynik bezpiecznie poniżej.' : ''}
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-pp-accent/20 flex items-center justify-center text-pp-accent shrink-0">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6">
-                    {selectedFile ? (
-                      <button
-                        onClick={handleDownloadResult}
-                        className="w-full px-4 py-3 bg-pp-surface hover:bg-pp-border border border-pp-border rounded-xl text-white text-sm font-medium transition flex items-center justify-center gap-2 group"
-                      >
-                        <svg className="w-5 h-5 text-pp-text-muted group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Pobierz dokument z z powrotem jawnymi danymi
-                      </button>
-                    ) : (
-                      <div className="bg-pp-surface/50 border border-pp-border/50 rounded-xl p-4 mt-2">
-                        {resultQuery.isLoading ? (
-                          <div className="flex items-center gap-2 text-pp-text-muted">
-                            <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
-                            <span className="text-sm">Pobieranie wyniku...</span>
-                          </div>
-                        ) : resultQuery.data ? (
-                          <p className="text-sm text-white break-words whitespace-pre-wrap leading-relaxed">
-                            {resultQuery.data.result_text}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-red-400">Nie udało się pobrać wyniku.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-red-900/20 border border-red-900/50 rounded-2xl rounded-tl-sm p-4 text-sm text-red-500">
-                  Model AI zwrócił błąd. Spróbuj zmienić wybrany model w prawym górnym rogu.
-                </div>
-              )}
+              </div>
             </div>
            </div>
         )}
@@ -474,29 +712,25 @@ function NewTask() {
 
       {/* Input Area (Bottom Fixed-like) */}
       <div className="p-4 bg-pp-bg border-t border-pp-border absolute bottom-0 w-full max-w-4xl left-1/2 -translate-x-1/2">
-        {!selectedFile ? (
+        {step === 'input' && !selectedFile ? (
            <div className="relative">
              <textarea
                value={inputText}
                onChange={(e) => setInputText(e.target.value)}
-               disabled={step !== 'input'}
                placeholder="Napisz tekst do anonimizacji..."
-               className="w-full bg-pp-surface border border-pp-border rounded-2xl pl-5 pr-24 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors disabled:opacity-50 h-16 shadow-lg leading-tight"
+               className="w-full bg-pp-surface border border-pp-border rounded-2xl pl-5 pr-24 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors h-16 shadow-lg leading-tight"
                onKeyDown={(e) => {
                  if (e.key === 'Enter' && !e.shiftKey) {
                    e.preventDefault();
-                   if (step === 'input' && inputText.trim()) handleSubmitInitial();
+                   if (inputText.trim()) handleSubmitInitial();
                  }
                }}
              />
              
-             {/* Action buttons inside input */}
              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {/* File Upload Button */}
                 <button
-                  disabled={step !== 'input'}
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-pp-text-muted hover:text-white transition-colors disabled:opacity-50"
+                  className="p-2 text-pp-text-muted hover:text-white transition-colors"
                   title="Załącz plik z dysku"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,9 +748,8 @@ function NewTask() {
                   accept=".docx,.xlsx,.eml,.msg,.txt"
                 />
                 
-                {/* Submit Text Button */}
                 <button
-                  disabled={step !== 'input' || !inputText.trim()}
+                  disabled={!inputText.trim()}
                   onClick={handleSubmitInitial}
                   className="w-8 h-8 bg-pp-accent hover:bg-pp-accent-light text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:bg-pp-border disabled:hover:bg-pp-border"
                 >
@@ -526,7 +759,7 @@ function NewTask() {
                 </button>
              </div>
            </div>
-        ) : (
+        ) : step === 'input' && selectedFile ? (
           <div className="flex items-center justify-between bg-pp-surface border border-pp-border rounded-2xl px-5 py-4 shadow-lg min-h-[64px]">
              <div className="flex items-center gap-3">
                <svg className="w-5 h-5 text-pp-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -540,24 +773,50 @@ function NewTask() {
              
              <div className="flex items-center gap-2">
                <button
-                 disabled={step !== 'input'}
                  onClick={() => setSelectedFile(null)}
-                 className="p-2 text-pp-text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                 className="p-2 text-pp-text-muted hover:text-red-400 transition-colors"
                >
                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                  </svg>
                </button>
                <button
-                  disabled={step !== 'input'}
                   onClick={handleSubmitInitial}
-                  className="px-4 py-1.5 bg-pp-accent hover:bg-pp-accent-light text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+                  className="px-4 py-1.5 bg-pp-accent hover:bg-pp-accent-light text-white text-sm font-medium rounded-lg transition-all"
                 >
                   Prześlij plik
                 </button>
              </div>
           </div>
-        )}
+        ) : step === 'done' ? (
+           <div className="relative">
+             <textarea
+               value={chatInput}
+               onChange={(e) => setChatInput(e.target.value)}
+               disabled={sendChatMutation.isPending || taskStatus === 'processing'}
+               placeholder="Napisz kolejną wiadomość w tym samym kontekście by kontynuować dyskusję..."
+               className="w-full bg-pp-surface border border-pp-border rounded-2xl pl-5 pr-16 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors disabled:opacity-50 h-16 shadow-lg leading-tight"
+               onKeyDown={(e) => {
+                 if (e.key === 'Enter' && !e.shiftKey) {
+                   e.preventDefault();
+                   if (chatInput.trim()) sendChatMutation.mutate(chatInput);
+                 }
+               }}
+             />
+             
+             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                <button
+                  disabled={!chatInput.trim() || sendChatMutation.isPending || taskStatus === 'processing'}
+                  onClick={() => sendChatMutation.mutate(chatInput)}
+                  className="w-8 h-8 bg-pp-accent hover:bg-pp-accent-light text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:bg-pp-border disabled:hover:bg-pp-border"
+                >
+                  <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+             </div>
+           </div>
+        ) : null}
       </div>
     </div>
   );

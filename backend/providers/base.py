@@ -19,13 +19,13 @@ class AIProvider(ABC):
     """Abstract base class for AI providers."""
 
     @abstractmethod
-    async def process(self, text: str, instruction: str) -> str:
+    async def process(self, text: str, messages: list[dict[str, str]]) -> str:
         """
-        Send anonymized text to the AI provider with an instruction.
+        Send anonymized text to the AI provider with full conversation history.
 
         Args:
             text: The anonymized text (contains tokens, not real PII).
-            instruction: The user's instruction for what the AI should do.
+            messages: List of chat messages, e.g. [{"role": "user", "content": "..."}]
 
         Returns:
             The AI's response text (still containing tokens).

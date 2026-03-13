@@ -25,19 +25,39 @@ class GeminiProvider(AIProvider):
     def name(self) -> str:
         return "Gemini 2.5 Flash (Google)"
 
-    async def process(self, text: str, instruction: str) -> str:
-        """Send anonymized text to Gemini for processing."""
+    async def process(self, text: str, messages: list[dict[str, str]]) -> str:
+        """Send anonymized text and chat history to Gemini."""
         logger.info(f"Sending request to Gemini ({self._model_name})")
 
-        prompt = (
-            f"Instrukcja: {instruction}\n\n"
-            f"Poniżej znajduje się tekst dokumentu do przetworzenia. "
-            f"Tokeny w nawiasach kwadratowych (np. [OSOBA_a3f2]) to "
-            f"zamaskowane dane poufne — zachowaj je bez zmian w odpowiedzi.\n\n"
-            f"Tekst:\n{text}"
-        )
-
-        response = await self._model.generate_content_async(prompt)
+        history = []
+        history.append({
+            "role": "user",
+            "parts": [
+                f"Jesteś asystentem przetwarzającym dokumenty. Twoim zadaniem jest modyfikacja tekstu według instrukcji.\n\n"
+                f"ZASADY KOMUNIKACJI:\n"
+                f"1. Jeśli wykonujesz modyfikację dokumentu, zwróć jego PEŁNĄ treść zamkniętą w tagach <ROZWIAZANIE> i </ROZWIAZANIE>. Nie dodawaj wstępów ani komentarzy poza tymi tagami.\n"
+                f"2. Jeśli instrukcja jest niejasna, brakuje danych lub chcesz coś doprecyzować, napisz normalną wiadomość BEZ używania tagów <ROZWIAZANIE>.\n"
+                f"3. Tokeny w nawiasach kwadratowych (np. [OSOBA_a3f2]) to zamaskowane dane poufne — zachowaj je bez zmian wewnątrz tagów <ROZWIAZANIE>.\n\n"
+                f"Tekst dokumentu do przetworzenia:\n{text}"
+            ]
+        })
+        history.append({
+            "role": "model",
+            "parts": ["Zrozumiałem. Czekam na instrukcje."]
+        })
+        
+        for msg in messages[:-1]:
+            role = "user" if msg["role"] == "user" else "model"
+            history.append({
+                "role": role,
+                "parts": [msg["content"]]
+            })
+            
+        chat = self._model.start_chat(history=history)
+        
+        last_msg = messages[-1]["content"]
+        response = await chat.send_message_async(last_msg)
+        
         response_text = response.text or ""
 
         logger.info(f"Gemini response received: {len(response_text)} chars")

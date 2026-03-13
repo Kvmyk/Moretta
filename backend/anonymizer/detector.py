@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
-
+import re
 import httpx
 from presidio_analyzer import AnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpEngineProvider
@@ -31,6 +31,38 @@ PII_TYPE_REMAP = {
     "IP_ADDRESS": "IP_ADDRESS",
 }
 
+# ── Custom Regex Patterns for Polish Data ──────────────────────────
+
+POLISH_REGEX_RULES = [
+    {
+        "type": "NIP",
+        # Obiekty typu 123-456-78-19, 1234567819, 123-45-67-819
+        "pattern": r"\b[0-9]{3}-?[0-9]{2}-?[0-9]{2}-?[0-9]{3}\b|\b[0-9]{3}-?[0-9]{3}-?[0-9]{2}-?[0-9]{2}\b",
+    },
+    {
+        "type": "REGON",
+        # 9 or 14 digits
+        "pattern": r"\b[0-9]{9}\b|\b[0-9]{14}\b",
+    },
+    {
+        "type": "PHONE_NUMBER",
+        # Polish numbers with optional +48/0048 and spaces/dashes
+        "pattern": r"(?:\+48|0048)?\s*(?:[1-9][0-9]{2}[\s\-]?[0-9]{3}[\s\-]?[0-9]{3}|[1-9][0-9][\s\-]?[0-9]{3}[\s\-]?[0-9]{2}[\s\-]?[0-9]{2})\b",
+    },
+    {
+        "type": "KRS",
+        "pattern": r"\b0000[0-9]{6}\b",
+    },
+    {
+        "type": "PESEL",
+        "pattern": r"\b[0-9]{11}\b",
+    },
+    {
+        "type": "IBAN_CODE",
+        # Standard Polish IBAN is 26 digits, sometimes prefixed with PL
+        "pattern": r"\b(?:PL)?[\s]*[0-9]{2}[\s]*[0-9]{4}[\s]*[0-9]{4}[\s]*[0-9]{4}[\s]*[0-9]{4}[\s]*[0-9]{4}[\s]*[0-9]{4}\b",
+    }
+]
 
 class PiiDetector:
     """Two-stage PII detection: Presidio + Ollama LLM."""
@@ -64,16 +96,13 @@ class PiiDetector:
         results.extend(presidio_results)
         logger.info(f"Presidio detected {len(presidio_results)} PII entities")
 
-        # Stage 2: Ollama LLM
-        try:
-            ollama_results = await self._detect_ollama(text)
-            # Deduplicate against Presidio results
-            for item in ollama_results:
-                if not self._is_duplicate(item, results):
-                    results.append(item)
-            logger.info(f"Ollama detected {len(ollama_results)} additional PII entities")
-        except Exception as exc:
-            logger.warning(f"Ollama detection failed (continuing with Presidio only): {exc}")
+        # Stage 2: Custom Regex (replaces unreliable Ollama)
+        regex_results = self._detect_regex(text)
+        # Deduplicate against Presidio results
+        for item in regex_results:
+            if not self._is_duplicate(item, results):
+                results.append(item)
+        logger.info(f"Custom Regex detected {len(regex_results)} additional PII entities")
 
         return results
 
@@ -107,66 +136,29 @@ class PiiDetector:
 
         return results
 
-    async def _detect_ollama(self, text: str) -> list[dict[str, Any]]:
-        """Stage 2: Contextual PII detection via local LLM (Ollama)."""
-        # Truncate very long texts to fit model context
-        MAX_CHARS = 8000
-        fragment = text[:MAX_CHARS] if len(text) > MAX_CHARS else text
-
-        prompt = (
-            "Przeanalizuj poniższy tekst. Zwróć w formacie JSON listę dodatkowych "
-            "danych poufnych, których mogło nie wykryć standardowe narzędzie. "
-            "Szczególną uwagę zwróć na: imiona i nazwiska (jako typ: PERSON) oraz "
-            "pełne adresy zamieszkania/pobytu (jako typ: LOCATION). "
-            "Szukaj też innych danych: kody projektów, wewnętrzne ID, nazwy klientów, kwoty finansowe. "
-            "Format: "
-            '[{"text": "...", "type": "...", "start": N, "end": N}]\n\n'
-            "Jeśli nie znajdziesz żadnych dodatkowych danych poufnych, zwróć: []\n\n"
-            f"Tekst: {fragment}"
-        )
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"{self._ollama_url}/api/generate",
-                json={
-                    "model": self._model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.1},
-                },
-            )
-            response.raise_for_status()
-
-        data = response.json()
-        raw_response = data.get("response", "").strip()
-
-        # Parse JSON from LLM response
-        try:
-            # Try to extract JSON array from response
-            start_idx = raw_response.find("[")
-            end_idx = raw_response.rfind("]")
-            if start_idx != -1 and end_idx != -1:
-                json_str = raw_response[start_idx:end_idx + 1]
-                items = json.loads(json_str)
-            else:
-                items = []
-        except (json.JSONDecodeError, ValueError):
-            logger.warning(f"Failed to parse Ollama JSON response: {raw_response[:200]}")
-            items = []
-
+    def _detect_regex(self, text: str) -> list[dict[str, Any]]:
+        """Stage 2: Deterministic Regex-based detection for Polish business formats."""
         results = []
-        for item in items:
-            if isinstance(item, dict) and "text" in item and "type" in item:
+
+        for rule in POLISH_REGEX_RULES:
+            pattern = re.compile(rule["pattern"], re.IGNORECASE)
+            for match in pattern.finditer(text):
                 results.append({
-                    "text": item["text"],
-                    "type": item.get("type", "UNKNOWN"),
-                    "start": item.get("start", 0),
-                    "end": item.get("end", 0),
-                    "score": 0.7,
-                    "source": "ollama",
+                    "text": match.group(),
+                    "type": rule["type"],
+                    "start": match.start(),
+                    "end": match.end(),
+                    "score": 0.85,
+                    "source": "regex",
                 })
 
-        return results
+        # Optymalizacja: usuwamy te regexy, które nachodzą na siebie (np. regex PESEL wewnątrz regex IBAN)
+        filtered_results = []
+        for item in sorted(results, key=lambda x: x["end"] - x["start"], reverse=True): # Najpierw najdłuższe (IBAN > PESEL)
+            if not self._is_duplicate(item, filtered_results, overlap_threshold=0.1):
+                filtered_results.append(item)
+
+        return filtered_results
 
     @staticmethod
     def _is_duplicate(
@@ -184,3 +176,71 @@ class PiiDetector:
                 if item_len > 0 and overlap_len / item_len >= overlap_threshold:
                     return True
         return False
+
+    async def detect_deep_async(self, text: str, existing_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Stage 2: Asynchronous Deep Scan via local LLM (Ollama)."""
+        # Truncate very long texts to fit model context
+        MAX_CHARS = 8000
+        fragment = text[:MAX_CHARS] if len(text) > MAX_CHARS else text
+
+        prompt = (
+            "Przeanalizuj poniższy tekst biznesowy pod kątem wycieków danych (Data Leak Prevention). "
+            "Zwróć w formacie JSON listę poufnych informacji, takich jak nazwy tajnych projektów, "
+            "kwoty finansowe powiązane z osobami, wewnętrzne ID, czy stanowiska zarządu ukryte w tekście. "
+            "UWAGA: Pomiń standardowe rzeczy jak PESEL czy NIP, szukaj tylko nieoczywistych, dających się powiązać z osobą danych.\n\n"
+            "Format wyjściowy (zawsze jako poprawna tablica JSON, NIC WIECEJ):\n"
+            '[{"text": "znaleziony fragment", "type": "OTHER_PII", "start": N, "end": N}]\n\n'
+            "Jeśli nie znajdziesz żadnych poufnych danych, zwróć dokładnie: []\n\n"
+            f"Tekst:\n{fragment}"
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{self._ollama_url}/api/generate",
+                    json={
+                        "model": self._model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": 0.1},
+                    },
+                )
+                response.raise_for_status()
+
+            data = response.json()
+            raw_response = data.get("response", "").strip()
+
+            start_idx = raw_response.find("[")
+            end_idx = raw_response.rfind("]")
+            if start_idx != -1 and end_idx != -1:
+                json_str = raw_response[start_idx:end_idx + 1]
+                items = json.loads(json_str)
+            else:
+                items = []
+                
+            new_results = []
+            for item in items:
+                if isinstance(item, dict) and "text" in item and "type" in item:
+                    # Treat start/end loosely since LLM might hallucinate indexes, fallback to string matching
+                    text_found = item["text"]
+                    if text_found in text:
+                        start_real = text.find(text_found)
+                        end_real = start_real + len(text_found)
+                        
+                        pii_entry = {
+                            "text": text_found,
+                            "type": item.get("type", "OTHER_PII"),
+                            "start": start_real,
+                            "end": end_real,
+                            "score": 0.6,
+                            "source": "ollama_deep",
+                        }
+                        if not self._is_duplicate(pii_entry, existing_results):
+                            new_results.append(pii_entry)
+            
+            logger.info(f"Ollama deep scan detected {len(new_results)} additional PII entities")
+            return new_results
+
+        except Exception as exc:
+            logger.warning(f"Ollama deep scan failed: {exc}")
+            return []
