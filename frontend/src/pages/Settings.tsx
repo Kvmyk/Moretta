@@ -91,11 +91,11 @@ function Settings() {
               <strong className="text-pp-text">Jak skonfigurować?</strong> Ustaw zmienne środowiskowe w pliku <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code>:
             </p>
             <pre className="mt-2 text-[13px] font-mono text-[#f5f5f5] bg-[#050408] border border-pp-border/50 rounded-lg p-5 overflow-x-auto shadow-2xl leading-relaxed">
-<span className="opacity-50"># Configuration keys</span>
-<span className="text-pp-accent">ANTHROPIC_API_KEY</span>=sk-ant-...
-<span className="text-pp-accent">OPENAI_API_KEY</span>=sk-...
-<span className="text-pp-accent">GOOGLE_AI_API_KEY</span>=AI...
-<span className="text-pp-accent">DEFAULT_PROVIDER</span>=claude
+              <div className="opacity-50"># Configuration keys</div>
+              <div><span className="text-pp-accent">ANTHROPIC_API_KEY</span>=sk-ant-...</div>
+              <div><span className="text-pp-accent">OPENAI_API_KEY</span>=sk-...</div>
+              <div><span className="text-pp-accent">GOOGLE_AI_API_KEY</span>=AI...</div>
+              <div><span className="text-pp-accent">DEFAULT_PROVIDER</span>=claude</div>
             </pre>
           </div>
         </div>

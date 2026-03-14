@@ -420,7 +420,7 @@ function NewTask() {
       <div className="flex items-center justify-between mb-6 px-8 py-4 bg-pp-surface rounded-xl border border-pp-border shadow-2xl shadow-pp-accent/5 backdrop-blur-xl">
         <div>
           <h2 className="text-xl font-semibold text-white">Moretta Intelligence</h2>
-          <p className="text-xs text-pp-accent mt-1 tracking-wider uppercase font-medium">Privacy in plain sight • Local inference</p>
+          <p className="text-xs text-pp-accent mt-1 tracking-wider uppercase font-medium">Brama do AI • Automatyczna anonimizacja PII</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-pp-text-muted">AI Config:</span>
@@ -454,7 +454,7 @@ function NewTask() {
             </div>
             <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-5 max-w-2xl shadow-xl">
               <p className="text-sm text-pp-text leading-relaxed">
-                Welcome to Moretta. I am your silent proxy. Provide your document or text, and I will mask all sensitive information before processing it with the intelligence of your choice.
+                Witaj w Moretta. Prześlij dokument lub wpisz tekst — automatycznie zanonimizuję dane wrażliwe przed ich przetworzeniem przez wybrane modele AI.
               </p>
             </div>
           </div>
@@ -468,15 +468,15 @@ function NewTask() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <div className="bg-pp-accent text-white rounded-2xl rounded-tr-sm p-4 max-w-2xl shadow-lg">
+            <div className="bg-pp-accent text-pp-bg rounded-2xl rounded-tr-sm p-4 max-w-2xl shadow-lg font-medium">
               {selectedFile ? (
                 <div className="flex items-center gap-3">
-                  <svg className="w-6 h-6 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-6 h-6 text-pp-bg/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                   </svg>
                   <div>
-                    <span className="font-medium block">{selectedFile.name}</span>
-                    <span className="text-xs text-white/70">{formatFileSize(selectedFile.size)}</span>
+                    <span className="font-bold block">{selectedFile.name}</span>
+                    <span className="text-xs text-pp-bg/70">{formatFileSize(selectedFile.size)}</span>
                   </div>
                 </div>
               ) : (
@@ -490,7 +490,7 @@ function NewTask() {
         {(step === 'pii_detected' || step === 'processing' || step === 'done') && (
           <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4">
             <div className="w-8 h-8 rounded-full bg-pp-accent flex items-center justify-center shrink-0">
-               <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <svg className="w-4 h-4 text-pp-bg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
@@ -540,7 +540,7 @@ function NewTask() {
                         <button
                           onClick={handleSendToAI}
                           disabled={createTaskMutation.isPending || piiQuery.data.deep_scan_completed === false}
-                          className="px-6 py-2.5 bg-pp-accent hover:bg-pp-accent-light text-white text-sm font-medium rounded-xl transition-all shadow-md shadow-pp-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          className="px-6 py-2.5 bg-pp-accent hover:bg-pp-accent-light text-pp-bg text-sm font-bold rounded-xl transition-all shadow-md shadow-pp-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                           {createTaskMutation.isPending ? 'Wysyłanie...' : 'Wyślij do AI'}
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -548,6 +548,7 @@ function NewTask() {
                           </svg>
                         </button>
                       </div>
+
                       {securityError && (
                         <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3 items-start">
                           <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -593,7 +594,7 @@ function NewTask() {
                  )}
               </div>
               <div className={`rounded-2xl p-4 max-w-2xl shadow-sm ${
-                msg.role === 'user' ? 'bg-pp-accent rounded-tr-sm text-white' : 'bg-pp-surface border border-pp-border rounded-tl-sm text-pp-text'
+                msg.role === 'user' ? 'bg-pp-accent rounded-tr-sm text-pp-bg font-medium' : 'bg-pp-surface border border-pp-border rounded-tl-sm text-pp-text'
               }`}>
                 {isLastAssistant ? (
                   <div className="space-y-4">
@@ -670,7 +671,7 @@ function NewTask() {
                       </div>
                       <button 
                         onClick={handleDownloadResult}
-                        className="bg-pp-accent hover:bg-pp-accent-light text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg"
+                        className="bg-pp-accent hover:bg-pp-accent-light text-pp-bg px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg"
                       >
                         POBIERZ
                       </button>
@@ -750,7 +751,7 @@ function NewTask() {
                 <button
                   disabled={!inputText.trim()}
                   onClick={handleSubmitInitial}
-                  className="w-8 h-8 bg-pp-accent hover:bg-pp-accent-light text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:bg-pp-border disabled:hover:bg-pp-border"
+                  className="w-8 h-8 bg-pp-accent hover:bg-pp-accent-light text-pp-bg rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:bg-pp-border disabled:hover:bg-pp-border"
                 >
                   <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -781,7 +782,7 @@ function NewTask() {
                </button>
                <button
                   onClick={handleSubmitInitial}
-                  className="px-4 py-1.5 bg-pp-accent hover:bg-pp-accent-light text-white text-sm font-medium rounded-lg transition-all"
+                  className="px-4 py-1.5 bg-pp-accent hover:bg-pp-accent-light text-pp-bg text-sm font-bold rounded-lg transition-all"
                 >
                   Prześlij plik
                 </button>
