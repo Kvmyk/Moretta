@@ -29,7 +29,7 @@ function AuditLog() {
 
   const formatTimestamp = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString('pl-PL', {
+    return d.toLocaleDateString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -41,12 +41,12 @@ function AuditLog() {
 
   const eventLabel = (event: string) => {
     const labels: Record<string, string> = {
-      'file_uploaded': 'Plik wczytany',
-      'pii_detected': 'PII wykryte',
-      'task_created': 'Zadanie utworzone',
-      'ai_response_received': 'Odpowiedź AI',
-      'reinjection_complete': 'Reinjekcja zakończona',
-      'task_failed': 'Zadanie nie powiodło się',
+      'file_uploaded': 'File uploaded',
+      'pii_detected': 'PII detected',
+      'task_created': 'Task created',
+      'ai_response_received': 'AI Response',
+      'reinjection_complete': 'Re-injection complete',
+      'task_failed': 'Task failed',
     };
     return labels[event] || event;
   };
@@ -97,27 +97,27 @@ function AuditLog() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-semibold text-white">Logi audytu</h2>
+          <h2 className="text-2xl font-semibold text-white">Audit Logs</h2>
           <p className="text-sm text-pp-text-muted mt-1">
-            Niemodyfikowalny log wszystkich zdarzeń — {total} wpisów
+            Immutable log of all events — {total} entries
           </p>
         </div>
         <button
           onClick={handleExportCSV}
           className="px-4 py-2 bg-pp-surface border border-pp-border rounded-lg text-sm font-medium text-pp-text hover:bg-pp-surface-light transition-colors"
         >
-          Eksport CSV ↓
+          CSV Export ↓
         </button>
       </div>
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-pp-text-muted py-8 justify-center">
           <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Ładowanie...</span>
+          <span className="text-sm">Loading...</span>
         </div>
       ) : !data?.entries?.length ? (
         <div className="text-center py-16">
-          <p className="text-pp-text-muted text-sm">Brak wpisów audytu</p>
+          <p className="text-pp-text-muted text-sm">No audit entries found</p>
         </div>
       ) : (
         <>
@@ -125,12 +125,12 @@ function AuditLog() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-pp-border">
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Czas</th>
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Zdarzenie</th>
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Sesja</th>
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Plik</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Time</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Event</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Session</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">File</th>
                   <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">PII</th>
-                  <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Granica</th>
+                  <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Boundary</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,7 +159,7 @@ function AuditLog() {
           {/* Pagination */}
           <div className="flex items-center justify-between mt-4">
             <span className="text-xs text-pp-text-muted">
-              Wyświetlanie {offset + 1}–{Math.min(offset + limit, total)} z {total}
+              Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
             </span>
             <div className="flex gap-2">
               <button
@@ -167,14 +167,14 @@ function AuditLog() {
                 disabled={!canPrev}
                 className="px-3 py-1.5 text-xs bg-pp-surface border border-pp-border rounded-lg text-pp-text-muted disabled:opacity-30 hover:bg-pp-surface-light transition-colors"
               >
-                ← Poprzednie
+                ← Previous
               </button>
               <button
                 onClick={() => setOffset(offset + limit)}
                 disabled={!canNext}
                 className="px-3 py-1.5 text-xs bg-pp-surface border border-pp-border rounded-lg text-pp-text-muted disabled:opacity-30 hover:bg-pp-surface-light transition-colors"
               >
-                Następne →
+                Next →
               </button>
             </div>
           </div>

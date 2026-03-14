@@ -22,14 +22,14 @@ function Settings() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-semibold text-white mb-8">Ustawienia</h2>
+      <h2 className="text-2xl font-semibold text-white mb-8">Settings</h2>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-pp-surface border border-pp-border rounded-xl p-1 mb-8">
         {[
-          { id: 'providers' as const, label: 'Providerzy AI' },
-          { id: 'pii' as const, label: 'Reguły PII' },
-          { id: 'model' as const, label: 'Model lokalny' },
+          { id: 'providers' as const, label: 'AI Providers' },
+          { id: 'pii' as const, label: 'PII Rules' },
+          { id: 'model' as const, label: 'Local Model' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -49,7 +49,7 @@ function Settings() {
       {activeTab === 'providers' && (
         <div className="space-y-4">
           <p className="text-sm text-pp-text-muted mb-6">
-            Klucze API do zewnętrznych providerów AI. Konfigurowane przez zmienne środowiskowe (.env).
+            API keys for external AI providers. Configured via environment variables (.env).
           </p>
 
           {providersData?.providers.map((provider) => (
@@ -62,7 +62,7 @@ function Settings() {
                   <h3 className="text-white font-medium">{provider.name}</h3>
                   {providersData.default === provider.id && (
                     <span className="text-[10px] bg-pp-accent/20 text-pp-accent border border-pp-accent/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                      domyślny
+                      default
                     </span>
                   )}
                 </div>
@@ -74,12 +74,12 @@ function Settings() {
                 {provider.configured ? (
                   <span className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
                     <div className="w-2 h-2 bg-green-400 rounded-full" />
-                    Skonfigurowany
+                    Configured
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-pp-text-muted text-xs">
                     <div className="w-2 h-2 bg-pp-text-muted rounded-full" />
-                    Brak klucza API
+                    API key missing
                   </span>
                 )}
               </div>
@@ -88,7 +88,7 @@ function Settings() {
 
           <div className="mt-6 p-4 bg-pp-surface-light border border-pp-border rounded-xl">
             <p className="text-xs text-pp-text-muted">
-              <strong className="text-pp-text">Jak skonfigurować?</strong> Ustaw zmienne środowiskowe w pliku <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code>:
+              <strong className="text-pp-text">How to configure?</strong> Set environment variables in the <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code> file:
             </p>
             <pre className="mt-2 text-[13px] font-mono text-[#f5f5f5] bg-[#050408] border border-pp-border/50 rounded-lg p-5 overflow-x-auto shadow-2xl leading-relaxed">
               <div className="opacity-50"># Configuration keys</div>
@@ -105,31 +105,31 @@ function Settings() {
       {activeTab === 'pii' && (
         <div className="space-y-4">
           <p className="text-sm text-pp-text-muted mb-6">
-            Typy danych poufnych wykrywane przez system. Presidio wykrywa standardowe PII,
-            a model lokalny (Ollama) identyfikuje dane kontekstowe.
+            Types of sensitive data detected by the system. Presidio detects standard PII,
+            and the local model (Ollama) identifies contextual data.
           </p>
 
           <div className="bg-pp-surface border border-pp-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-pp-border">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Typ</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Źródło</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Priorytet</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Type</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Source</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Priority</th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { type: 'Imię i nazwisko', source: 'Presidio', severity: 'critical' },
-                  { type: 'PESEL / NIP', source: 'Presidio', severity: 'critical' },
-                  { type: 'Adres e-mail', source: 'Presidio', severity: 'critical' },
-                  { type: 'Numer telefonu', source: 'Presidio', severity: 'critical' },
-                  { type: 'IBAN / Karta kredytowa', source: 'Presidio', severity: 'critical' },
-                  { type: 'Adres zamieszkania', source: 'Presidio', severity: 'warning' },
-                  { type: 'Kwoty finansowe', source: 'Ollama LLM', severity: 'warning' },
-                  { type: 'Kody projektów', source: 'Ollama LLM', severity: 'info' },
-                  { type: 'Nazwy klientów', source: 'Ollama LLM', severity: 'warning' },
-                  { type: 'Numery umów', source: 'Ollama LLM', severity: 'info' },
+                  { type: 'Full Name', source: 'Presidio', severity: 'critical' },
+                  { type: 'ID / VAT Number', source: 'Presidio', severity: 'critical' },
+                  { type: 'Email Address', source: 'Presidio', severity: 'critical' },
+                  { type: 'Phone Number', source: 'Presidio', severity: 'critical' },
+                  { type: 'IBAN / Credit Card', source: 'Presidio', severity: 'critical' },
+                  { type: 'Home Address', source: 'Presidio', severity: 'warning' },
+                  { type: 'Financial Amounts', source: 'Ollama LLM', severity: 'warning' },
+                  { type: 'Project Codes', source: 'Ollama LLM', severity: 'info' },
+                  { type: 'Client Names', source: 'Ollama LLM', severity: 'warning' },
+                  { type: 'Contract Numbers', source: 'Ollama LLM', severity: 'info' },
                 ].map((rule, i) => (
                   <tr key={i} className="border-b border-pp-border/50 hover:bg-pp-surface-light transition-colors">
                     <td className="px-5 py-3 text-white font-medium">{rule.type}</td>
@@ -146,7 +146,7 @@ function Settings() {
                         rule.severity === 'warning' ? 'bg-yellow-900/40 text-yellow-400 border border-yellow-900/50' :
                         'bg-pp-border/50 text-pp-text-muted'
                       }`}>
-                        {rule.severity === 'critical' ? 'Krytyczny' : rule.severity === 'warning' ? 'Ostrzeżenie' : 'Informacja'}
+                        {rule.severity === 'critical' ? 'Critical' : rule.severity === 'warning' ? 'Warning' : 'Info'}
                       </span>
                     </td>
                   </tr>
@@ -161,7 +161,7 @@ function Settings() {
       {activeTab === 'model' && (
         <div className="space-y-4">
           <p className="text-sm text-pp-text-muted mb-6">
-            Lokalny model AI używany do kontekstowej detekcji danych poufnych specyficznych dla firmy.
+            Local AI model used for contextual detection of company-specific sensitive data.
           </p>
 
           <div className="bg-pp-surface border border-pp-border rounded-xl overflow-hidden">
@@ -171,15 +171,15 @@ function Settings() {
                   <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Model</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">RAM</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">GPU</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Jakość</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-pp-text-muted uppercase">Quality</th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { name: 'phi4-mini', ram: '4 GB', gpu: 'Nie wymagany', quality: '★★★★★', active: true, recommended: true, desc: 'Lekki i potężny (3.8B), świetny w rozumowaniu' },
-                  { name: 'deepseek-r1:8b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★★', active: false, recommended: false, desc: 'Zaawansowane myślenie (CoT), wybitny w PII i logice' },
-                  { name: 'qwen2.5:7b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★★', active: false, recommended: false, desc: 'Najlepszy model uniwersalny (7B) dzisiejszych czasów' },
-                  { name: 'llama3.3:8b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★☆', active: false, recommended: false, desc: 'Niezawodny i szybki standard od firmy Meta' },
+                  { name: 'phi4-mini', ram: '4 GB', gpu: 'Not required', active: true, recommended: true, desc: 'Recommended. Fast and ideal for logic tasks.' },
+                  { name: 'deepseek-r1:8b', ram: '8 GB', gpu: 'Recommended', active: false, recommended: false, desc: 'Advanced reasoning.' },
+                  { name: 'qwen2.5:7b', ram: '8 GB', gpu: 'Recommended', active: false, recommended: false, desc: 'Powerful versatile model.' },
+                  { name: 'llama3.3:8b', ram: '8 GB', gpu: 'Recommended', active: false, recommended: false, desc: 'Reliable base model.' },
                 ].map((model) => (
                   <tr
                     key={model.name}
@@ -192,13 +192,13 @@ function Settings() {
                         <div className="flex items-center gap-2">
                           {model.name}
                           {model.recommended && (
-                            <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full whitespace-nowrap">
-                              🔥 Najlepszy wybór
+                            <span className="text-xs bg-pp-accent/20 text-pp-accent border border-pp-accent/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Recommended
                             </span>
                           )}
                           {model.active && (
                             <span className="ml-2 text-[10px] bg-pp-accent/20 text-pp-accent border border-pp-accent/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                          aktywny
+                          active
                         </span>
                           )}
                         </div>
@@ -207,7 +207,7 @@ function Settings() {
                     </td>
                     <td className="px-5 py-3 text-pp-text">{model.ram}</td>
                     <td className="px-5 py-3 text-pp-text">{model.gpu}</td>
-                    <td className="px-5 py-3 text-yellow-400">{model.quality}</td>
+                    <td className="px-5 py-3 text-pp-text">-</td>
                   </tr>
                 ))}
               </tbody>
@@ -216,7 +216,7 @@ function Settings() {
 
           <div className="mt-4 p-4 bg-pp-surface-light border border-pp-border rounded-xl">
             <p className="text-xs text-pp-text-muted">
-              Zmień model ustawiając <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">LOCAL_MODEL</code> w pliku <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code> i restartując kontener Ollama.
+              Change the model by setting <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">LOCAL_MODEL</code> in the <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code> file and restarting the Ollama container.
             </p>
           </div>
         </div>

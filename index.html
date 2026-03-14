@@ -145,12 +145,7 @@
             pointer-events: none;
         }
 
-        /* Mask animation */
-        50% {
-            transform: translateY(-10px);
-            filter: drop-shadow(0 0 50px rgba(7, 6, 10, 0.99)) drop-shadow(0 8px 40px rgba(120, 100, 160, 0.14));
-        }
-        }
+        /* Mask animation resolved below in .mask-wrap */
 
         .hero-eyebrow {
             font-family: 'DM Mono', monospace;
@@ -309,6 +304,10 @@
             width: 48px;
             height: 1px;
             background: var(--border2);
+        }
+
+        .section-label.no-line::after {
+            display: none;
         }
 
         .section-title {
@@ -992,52 +991,52 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>phi3:mini</td>
+                        <td>phi4-mini</td>
                         <td>4 GB</td>
                         <td>CPU only</td>
                         <td><span class="badge-sm badge-ok">Good</span></td>
                         <td>128k</td>
-                        <td>Default. Microsoft 3.8B. Runs on any server.</td>
+                        <td>Microsoft 3.8B (Jan 2026). Ideal for 8GB RAM systems.</td>
                     </tr>
                     <tr>
-                        <td>llama3.2:3b</td>
-                        <td>4 GB</td>
-                        <td>CPU only</td>
-                        <td><span class="badge-sm badge-good">Better</span></td>
-                        <td>128k</td>
-                        <td>Meta. Lightweight, strong multilingual NER.</td>
-                    </tr>
-                    <tr>
-                        <td>qwen3:4b</td>
-                        <td>4 GB</td>
-                        <td>CPU only</td>
-                        <td><span class="badge-sm badge-good">Better</span></td>
-                        <td>128k</td>
-                        <td>Alibaba Qwen3. Best multilingual PII on CPU.</td>
-                    </tr>
-                    <tr>
-                        <td>mistral:7b</td>
+                        <td>mistral:7b-small-3</td>
                         <td>8 GB</td>
                         <td>Optional</td>
                         <td><span class="badge-sm badge-good">Better</span></td>
                         <td>32k</td>
-                        <td>Fast, accurate. Recommended for 15&ndash;50 users.</td>
+                        <td>Latest Mistral Small. Optimized for speed/throughput.</td>
                     </tr>
                     <tr>
-                        <td>llama3.1:8b</td>
+                        <td>qwen3:7b</td>
+                        <td>8 GB</td>
+                        <td>Required</td>
+                        <td><span class="badge-sm badge-best">Best</span></td>
+                        <td>262k</td>
+                        <td>Alibaba Qwen3 (Feb 2026). Native multimodal & 200+ languages.</td>
+                    </tr>
+                    <tr>
+                        <td>llama3.3:8b</td>
                         <td>8 GB</td>
                         <td>Optional</td>
                         <td><span class="badge-sm badge-best">Best</span></td>
                         <td>128k</td>
-                        <td>Meta Llama 3.1. Best CPU-feasible quality.</td>
+                        <td>Meta Llama 3.3. Strong all-rounder for Nerv/extraction.</td>
                     </tr>
                     <tr>
-                        <td>qwen3:8b</td>
-                        <td>10 GB</td>
-                        <td>Optional</td>
-                        <td><span class="badge-sm badge-best">Best</span></td>
+                        <td>deepseek-v3.2:speciale</td>
+                        <td>12 GB</td>
+                        <td>Required</td>
+                        <td><span class="badge-sm badge-best">Elite</span></td>
                         <td>128k</td>
-                        <td>Top pick for 50+ users. Strongest multilingual.</td>
+                        <td>State-of-the-art reasoning on par with GPT-5.1.</td>
+                    </tr>
+                    <tr>
+                        <td>gpt-oss-120b</td>
+                        <td>80 GB+</td>
+                        <td>Multi-GPU</td>
+                        <td><span class="badge-sm badge-best">Elite</span></td>
+                        <td>128k</td>
+                        <td>OpenAI's top open-weight MoE model. Near frontier reasoning.</td>
                     </tr>
                 </tbody>
             </table>
@@ -1065,13 +1064,6 @@
                     </tr>
                     <tr>
                         <td>Anthropic</td>
-                        <td>claude-haiku-4-5</td>
-                        <td>$1.00</td>
-                        <td>$5.00</td>
-                        <td>200k tokens</td>
-                    </tr>
-                    <tr>
-                        <td>Anthropic</td>
                         <td>claude-opus-4-6</td>
                         <td>$15.00</td>
                         <td>$75.00</td>
@@ -1079,24 +1071,31 @@
                     </tr>
                     <tr>
                         <td>OpenAI</td>
-                        <td>chatgpt-4o-latest</td>
-                        <td>$2.50</td>
-                        <td>$10.00</td>
-                        <td>128k tokens</td>
+                        <td>gpt-5.3 "Garlic"</td>
+                        <td>$2.00</td>
+                        <td>$8.00</td>
+                        <td>400k tokens</td>
                     </tr>
                     <tr>
                         <td>Google</td>
-                        <td>gemini-2.5-pro</td>
+                        <td>gemini-3.1-pro</td>
                         <td>$1.25</td>
                         <td>$10.00</td>
-                        <td>1M tokens</td>
+                        <td>1M+ tokens</td>
                     </tr>
                     <tr>
-                        <td>OpenRouter</td>
-                        <td>gpt-oss-120b (MoE)</td>
+                        <td>OpenAI</td>
+                        <td>gpt-4.1 (Standard)</td>
+                        <td>$1.50</td>
+                        <td>$6.00</td>
+                        <td>1M+ tokens</td>
+                    </tr>
+                    <tr>
+                        <td>Xiaomi</td>
+                        <td>mimo-v2-flash</td>
                         <td>$0.40</td>
                         <td>$1.60</td>
-                        <td>128k tokens</td>
+                        <td>256k tokens</td>
                     </tr>
                 </tbody>
             </table>
@@ -1109,7 +1108,7 @@
 
     <!-- ── CTA ── -->
     <div class="cta-band reveal">
-        <p class="section-label" style="justify-content:center;max-width:180px;margin:0 auto 18px">Get started</p>
+        <p class="section-label no-line" style="justify-content:center;max-width:180px;margin:0 auto 18px">Get started</p>
         <h2 class="section-title">Download Moretta</h2>
         <p class="section-body">Open-source. MIT licence. Self-hosted.<br>Your data stays yours.</p>
         <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">

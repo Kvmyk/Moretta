@@ -33,7 +33,7 @@ function PiiDetectionCard({ types }: PiiDetectionCardProps) {
   if (!types.length) {
     return (
       <div className="py-4">
-        <p className="text-sm text-pp-text-muted">Nie wykryto danych poufnych</p>
+        <p className="text-sm text-pp-text-muted">No sensitive data detected</p>
       </div>
     );
   }
@@ -41,7 +41,7 @@ function PiiDetectionCard({ types }: PiiDetectionCardProps) {
   return (
     <div>
       <h4 className="text-xs font-semibold text-pp-text-muted flex items-center gap-2 mb-3">
-        WYKRYTE DANE POUFNE
+        DETECTED SENSITIVE DATA
         <span className="bg-pp-surface-light px-2 py-0.5 rounded-full text-white text-[10px]">
           {types.reduce((acc, curr) => acc + curr.count, 0)}
         </span>

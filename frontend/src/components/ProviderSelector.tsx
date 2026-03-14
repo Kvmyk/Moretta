@@ -89,7 +89,7 @@ function ProviderSelector({ provider, model, onProviderChange, onModelChange }: 
   if (!data) {
     return (
       <div className="flex items-center gap-3">
-        <span className="text-sm text-pp-text-muted">Ładowanie...</span>
+        <span className="text-sm text-pp-text-muted">Loading...</span>
       </div>
     );
   }

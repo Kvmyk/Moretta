@@ -31,11 +31,11 @@ function History() {
   const statusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-pp-accent/20 text-pp-accent border border-pp-accent/30 rounded-full">Ukończone</span>;
+        return <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-pp-accent/20 text-pp-accent border border-pp-accent/30 rounded-full">Completed</span>;
       case 'processing':
-        return <span className="px-2.5 py-1 text-xs font-medium bg-yellow-900/40 text-yellow-400 rounded-full">W trakcie</span>;
+        return <span className="px-2.5 py-1 text-xs font-medium bg-yellow-900/40 text-yellow-400 rounded-full">Processing</span>;
       case 'failed':
-        return <span className="px-2.5 py-1 text-xs font-medium bg-red-900/40 text-red-400 rounded-full">Błąd</span>;
+        return <span className="px-2.5 py-1 text-xs font-medium bg-red-900/40 text-red-400 rounded-full">Error</span>;
       default:
         return <span className="px-2.5 py-1 text-xs font-medium bg-gray-700 text-gray-400 rounded-full">{status}</span>;
     }
@@ -43,7 +43,7 @@ function History() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString('pl-PL', {
+    return d.toLocaleDateString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -71,29 +71,29 @@ function History() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-semibold text-white mb-8">Historia zadań</h2>
+      <h2 className="text-2xl font-semibold text-white mb-8">Task History</h2>
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-pp-text-muted py-8 justify-center">
           <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Ładowanie...</span>
+          <span className="text-sm">Loading...</span>
         </div>
       ) : !data?.tasks?.length ? (
         <div className="text-center py-16">
-          <p className="text-pp-text-muted text-sm">Brak wykonanych zadań</p>
-          <p className="text-pp-text-muted/50 text-xs mt-1">Nowe zadania pojawią się tutaj po przetworzeniu</p>
+          <p className="text-pp-text-muted text-sm">No tasks found</p>
+          <p className="text-pp-text-muted/50 text-xs mt-1">New tasks will appear here after processing</p>
         </div>
       ) : (
         <div className="bg-pp-surface border border-pp-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-pp-border">
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Data</th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Plik</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Date</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">File</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Provider</th>
-                <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Zamaskowane</th>
+                <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Masked</th>
                 <th className="text-center px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Status</th>
-                <th className="text-right px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Akcja</th>
+                <th className="text-right px-5 py-3.5 text-xs font-semibold text-pp-text-muted uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -112,7 +112,7 @@ function History() {
                         onClick={() => handleDownload(task.task_id, task.filename)}
                         className="text-xs font-bold uppercase tracking-widest text-pp-accent hover:text-pp-accent-light transition-colors"
                       >
-                        Pobierz ↓
+                        Download ↓
                       </button>
                     )}
                   </td>

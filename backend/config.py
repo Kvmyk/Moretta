@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     """Central configuration loaded from environment variables."""
 
     # ── Local Model (Ollama) ──────────────────────────────────────
-    local_model: str = "mistral:7b"
+    local_model: str = "phi4-mini"
     ollama_url: str = "http://ollama:11434"
 
     # ── Vault ─────────────────────────────────────────────────────
