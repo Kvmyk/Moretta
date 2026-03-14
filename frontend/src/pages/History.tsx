@@ -31,7 +31,7 @@ function History() {
   const statusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <span className="px-2.5 py-1 text-xs font-medium bg-green-900/40 text-green-400 rounded-full">Ukończone</span>;
+        return <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-pp-accent/20 text-pp-accent border border-pp-accent/30 rounded-full">Ukończone</span>;
       case 'processing':
         return <span className="px-2.5 py-1 text-xs font-medium bg-yellow-900/40 text-yellow-400 rounded-full">W trakcie</span>;
       case 'failed':
@@ -110,7 +110,7 @@ function History() {
                     {task.status === 'completed' && (
                       <button
                         onClick={() => handleDownload(task.task_id, task.filename)}
-                        className="text-xs font-medium text-pp-accent hover:text-pp-accent-light transition-colors"
+                        className="text-xs font-bold uppercase tracking-widest text-pp-accent hover:text-pp-accent-light transition-colors"
                       >
                         Pobierz ↓
                       </button>

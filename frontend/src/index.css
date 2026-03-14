@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@400;500;600;700&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -9,11 +11,15 @@
 }
 
 body {
-  background-color: #1a1a1a;
-  color: #e0e0e0;
+  background: radial-gradient(circle at top right, #100f16 0%, #07060a 100%);
+  color: #f5f5f5;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
 }
 
 /* Custom scrollbar */

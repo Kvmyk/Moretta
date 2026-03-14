@@ -12,8 +12,8 @@ function App() {
         <aside className="w-64 bg-pp-surface border-r border-pp-border flex flex-col shrink-0">
           {/* Logo */}
           <div className="p-6 border-b border-pp-border">
-            <h1 className="text-xl font-bold text-white tracking-tight">PrivateProxy</h1>
-            <p className="text-xs text-pp-text-muted mt-1">v0.1 — self-hosted</p>
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase">Moretta</h1>
+            <p className="text-[10px] text-pp-accent-light opacity-80 mt-1 uppercase tracking-[0.2em] font-medium italic">v0.5 • Muta Silentium</p>
           </div>
 
           {/* Navigation */}

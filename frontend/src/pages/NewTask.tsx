@@ -386,7 +386,7 @@ function NewTask() {
     return parts.map((part, idx) => {
       if (part.match(/^\[[A-Z0-9_]+_[a-f0-9]+\]$/)) {
         return (
-          <span key={idx} className="text-pp-green font-bold bg-pp-green/10 px-1 py-0.5 rounded">
+          <span key={idx} className="text-pp-accent font-bold bg-pp-accent/10 border border-pp-accent/20 px-1 py-0.5 rounded italic">
             {part}
           </span>
         );
@@ -404,26 +404,26 @@ function NewTask() {
       onDrop={onDrop}
     >
       {isDragging && (
-        <div className="absolute inset-0 z-50 bg-pp-bg/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200 pointer-events-none">
-          <div className="border-2 border-dashed border-pp-accent rounded-3xl p-12 flex flex-col items-center gap-4 bg-pp-surface shadow-2xl">
-            <div className="w-20 h-20 rounded-2xl bg-pp-accent/10 flex items-center justify-center text-pp-accent">
-              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <div className="absolute inset-0 z-50 bg-pp-bg/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300 pointer-events-none">
+          <div className="border border-pp-accent/30 rounded-[2rem] p-12 flex flex-col items-center gap-6 bg-pp-surface shadow-[0_0_50px_rgba(184,175,200,0.1)]">
+            <div className="w-24 h-24 rounded-full bg-pp-accent/5 flex items-center justify-center text-pp-accent border border-pp-accent/20">
+              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <p className="text-xl font-bold text-white uppercase tracking-wider">Upuść plik, aby przesłać</p>
-            <p className="text-pp-text-muted">Obsługiwane formaty: DOCX, XLSX, EML, MSG, TXT</p>
+            <p className="text-2xl font-serif text-white tracking-widest uppercase italic">Revelare</p>
+            <p className="text-pp-accent-light opacity-60 text-xs tracking-widest uppercase font-medium">Drop your secrets here</p>
           </div>
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 px-8 py-4 bg-pp-surface rounded-xl border border-pp-border">
+      <div className="flex items-center justify-between mb-6 px-8 py-4 bg-pp-surface rounded-xl border border-pp-border shadow-2xl shadow-pp-accent/5 backdrop-blur-xl">
         <div>
-          <h2 className="text-xl font-semibold text-white">Czat zadania</h2>
-          <p className="text-xs text-pp-text-muted mt-1">Bezpieczne przesyłanie poleceń do modeli AI</p>
+          <h2 className="text-xl font-semibold text-white">Moretta Intelligence</h2>
+          <p className="text-xs text-pp-accent mt-1 tracking-wider uppercase font-medium">Privacy in plain sight • Local inference</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-pp-text-muted">Model AI:</span>
+          <span className="text-sm text-pp-text-muted">AI Config:</span>
           <ProviderSelector
             provider={provider}
             model={model}
@@ -447,15 +447,14 @@ function NewTask() {
         {/* Intro bubble */}
         {step === 'input' && (
           <div className="flex gap-4">
-            <div className="w-8 h-8 rounded-full bg-pp-accent flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 rounded-full bg-pp-accent shadow-lg shadow-pp-accent/20 flex items-center justify-center shrink-0">
+               <svg className="w-6 h-6 text-pp-bg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-4 max-w-2xl">
-              <p className="text-sm text-pp-text">
-                Witaj! Wklej poniżej swój tekst, który chcesz zanonimizować, aby przetworzyć go wybranym modelem AI,
-                albo załącz plik (DOCX/XLSX/EML) korzystając z wbudowanej opcji.
+            <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-5 max-w-2xl shadow-xl">
+              <p className="text-sm text-pp-text leading-relaxed">
+                Welcome to Moretta. I am your silent proxy. Provide your document or text, and I will mask all sensitive information before processing it with the intelligence of your choice.
               </p>
             </div>
           </div>

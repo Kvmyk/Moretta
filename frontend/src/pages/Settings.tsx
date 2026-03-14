@@ -36,9 +36,9 @@ function Settings() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-2.5 px-4 text-sm font-medium rounded-lg transition-all duration-200 ${
               activeTab === tab.id
-                ? 'bg-pp-accent text-white'
+                ? 'bg-pp-accent text-pp-bg shadow-lg shadow-pp-accent/20'
                 : 'text-pp-text-muted hover:text-pp-text'
-            }`}
+            }`  }
           >
             {tab.label}
           </button>
@@ -61,7 +61,7 @@ function Settings() {
                 <div className="flex items-center gap-3">
                   <h3 className="text-white font-medium">{provider.name}</h3>
                   {providersData.default === provider.id && (
-                    <span className="text-xs bg-pp-accent/30 text-pp-green-text px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] bg-pp-accent/20 text-pp-accent border border-pp-accent/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
                       domyślny
                     </span>
                   )}
@@ -90,11 +90,12 @@ function Settings() {
             <p className="text-xs text-pp-text-muted">
               <strong className="text-pp-text">Jak skonfigurować?</strong> Ustaw zmienne środowiskowe w pliku <code className="bg-pp-bg px-1.5 py-0.5 rounded text-pp-green-text">.env</code>:
             </p>
-            <pre className="mt-2 text-xs font-mono text-pp-text-muted bg-pp-bg rounded-lg p-3 overflow-x-auto">
-{`ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GOOGLE_AI_API_KEY=AI...
-DEFAULT_PROVIDER=claude`}
+            <pre className="mt-2 text-[13px] font-mono text-[#f5f5f5] bg-[#050408] border border-pp-border/50 rounded-lg p-5 overflow-x-auto shadow-2xl leading-relaxed">
+<span className="opacity-50"># Configuration keys</span>
+<span className="text-pp-accent">ANTHROPIC_API_KEY</span>=sk-ant-...
+<span className="text-pp-accent">OPENAI_API_KEY</span>=sk-...
+<span className="text-pp-accent">GOOGLE_AI_API_KEY</span>=AI...
+<span className="text-pp-accent">DEFAULT_PROVIDER</span>=claude
             </pre>
           </div>
         </div>
@@ -140,10 +141,10 @@ DEFAULT_PROVIDER=claude`}
                       </span>
                     </td>
                     <td className="px-5 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        rule.severity === 'critical' ? 'bg-red-900/40 text-red-400' :
-                        rule.severity === 'warning' ? 'bg-yellow-900/40 text-yellow-400' :
-                        'bg-gray-700 text-gray-400'
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        rule.severity === 'critical' ? 'bg-red-900/40 text-red-400 border border-red-900/50' :
+                        rule.severity === 'warning' ? 'bg-yellow-900/40 text-yellow-400 border border-yellow-900/50' :
+                        'bg-pp-border/50 text-pp-text-muted'
                       }`}>
                         {rule.severity === 'critical' ? 'Krytyczny' : rule.severity === 'warning' ? 'Ostrzeżenie' : 'Informacja'}
                       </span>
@@ -196,9 +197,9 @@ DEFAULT_PROVIDER=claude`}
                             </span>
                           )}
                           {model.active && (
-                            <span className="text-xs bg-pp-accent/30 text-pp-green-text border border-pp-accent/50 px-2 py-0.5 rounded-full whitespace-nowrap">
-                              aktywny
-                            </span>
+                            <span className="ml-2 text-[10px] bg-pp-accent/20 text-pp-accent border border-pp-accent/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                          aktywny
+                        </span>
                           )}
                         </div>
                         <span className="text-xs text-pp-text-muted mt-1 font-sans">{model.desc}</span>

@@ -101,7 +101,7 @@ function ProviderSelector({ provider, model, onProviderChange, onModelChange }: 
         <select
           value={provider}
           onChange={(e) => onProviderChange(e.target.value)}
-          className="appearance-none bg-pp-surface border border-pp-border rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-white cursor-pointer hover:border-pp-accent focus:outline-none focus:border-pp-accent transition-colors"
+          className="appearance-none bg-pp-surface border border-pp-border rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-white cursor-pointer hover:border-pp-accent/50 focus:outline-none focus:border-pp-accent transition-all duration-300 shadow-lg shadow-black/20"
         >
           {configuredProviders.map((p) => (
             <option key={p.id} value={p.id}>
@@ -119,7 +119,7 @@ function ProviderSelector({ provider, model, onProviderChange, onModelChange }: 
         <select
           value={model}
           onChange={(e) => onModelChange(e.target.value)}
-          className="appearance-none bg-pp-surface border border-pp-border rounded-lg pl-3 pr-8 py-2 text-sm text-pp-text cursor-pointer hover:border-pp-accent focus:outline-none focus:border-pp-accent transition-colors max-w-[260px]"
+          className="appearance-none bg-pp-surface border border-pp-border rounded-lg pl-3 pr-8 py-2 text-sm text-pp-text cursor-pointer hover:border-pp-accent/50 focus:outline-none focus:border-pp-accent transition-all duration-300 shadow-lg shadow-black/20 max-w-[260px]"
         >
           {Object.entries(groupedModels).map(([tier, models]) => (
             <optgroup key={tier} label={tierLabel[tier] || tier}>

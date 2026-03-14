@@ -80,7 +80,7 @@ function PiiDetectionCard({ types }: PiiDetectionCardProps) {
                     {pii.matches.map((match, idx) => (
                       <li key={idx} className="text-xs text-pp-text bg-pp-surface px-2.5 py-1.5 rounded flex items-center gap-2 border border-pp-border/30">
                         <span className="text-pp-text-muted/50 select-none">•</span>
-                        <span className="font-mono text-pp-accent-light break-all">{match}</span>
+                        <span className="font-mono text-pp-accent break-all italic">{match}</span>
                       </li>
                     ))}
                   </ul>
