@@ -24,20 +24,17 @@ AVAILABLE_MODELS: dict[str, list[dict]] = {
 
     "openai": [
         # ── GPT-5 family ──────────────────────────────────────
-        {"id": "gpt-5.2",            "name": "GPT-5.2",            "tier": "flagship", "context": 400_000},
-        {"id": "gpt-5.2-pro",        "name": "GPT-5.2 Pro",        "tier": "flagship", "context": 400_000},
-        {"id": "gpt-5.1",            "name": "GPT-5.1",            "tier": "standard", "context": 400_000},
-        {"id": "gpt-5",              "name": "GPT-5",              "tier": "standard", "context": 400_000},
-        {"id": "gpt-5-mini",         "name": "GPT-5 Mini",         "tier": "fast",     "context": 400_000},
-        {"id": "gpt-5-nano",         "name": "GPT-5 Nano",         "tier": "fast",     "context": 400_000},
-        # ── GPT-5 Codex ──────────────────────────────────────
-        {"id": "gpt-5.2-codex",      "name": "GPT-5.2 Codex",      "tier": "codex",    "context": 400_000},
-        {"id": "gpt-5.1-codex",      "name": "GPT-5.1 Codex",      "tier": "codex",    "context": 400_000},
-        {"id": "gpt-5-codex",        "name": "GPT-5 Codex",        "tier": "codex",    "context": 400_000},
-        # ── GPT-4 family ─────────────────────────────────────
-        {"id": "gpt-4.1",            "name": "GPT-4.1",            "tier": "legacy",   "context": 1_047_576},
-        {"id": "gpt-4.1-mini",       "name": "GPT-4.1 Mini",       "tier": "legacy",   "context": 1_047_576},
-        {"id": "gpt-4.1-nano",       "name": "GPT-4.1 Nano",       "tier": "legacy",   "context": 1_047_576},
+        {"id": "gpt-5.4",            "name": "GPT-5.4",            "tier": "flagship", "context": 272_000},
+        {"id": "gpt-5.4-pro",        "name": "GPT-5.4 Pro",        "tier": "flagship", "context": 272_000},
+        {"id": "gpt-5.3-instant",    "name": "GPT-5.3 Instant",    "tier": "standard", "context": 400_000},
+        {"id": "gpt-5-mini",         "name": "GPT-5 Mini",         "tier": "fast",     "context": 128_000},
+        {"id": "gpt-5-nano",         "name": "GPT-5 Nano",         "tier": "fast",     "context": 32_000},
+        # ── Previous iterations ───────────────────────────────
+        {"id": "gpt-5.2",            "name": "GPT-5.2",            "tier": "legacy",   "context": 400_000},
+        {"id": "gpt-5.1",            "name": "GPT-5.1",            "tier": "legacy",   "context": 400_000},
+        # ── Specialized ─────────────────────────────────────
+        {"id": "gpt-5.3-codex",      "name": "GPT-5.3 Codex",      "tier": "codex",    "context": 1_000_000},
+        {"id": "gpt-4.1",            "name": "GPT-4.1",            "tier": "legacy",   "context": 1_000_000},
     ],
 
     "gemini": [
@@ -55,7 +52,7 @@ AVAILABLE_MODELS: dict[str, list[dict]] = {
 
 DEFAULT_MODELS = {
     "claude": "claude-sonnet-4-6-20260217",
-    "openai": "gpt-5.2",
+    "openai": "gpt-5.4",
     "gemini": "gemini-2.5-flash",
 }
 
