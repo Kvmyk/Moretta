@@ -1,114 +1,63 @@
-# PrivateProxy
+# Moretta v0.5
 
-**Self-hosted proxy for secure AI usage in enterprise environments.** PrivateProxy automatically detects and anonymizes confidential data (PII) from uploaded documents before sending them to external AI models like Claude, GPT-4o, or Gemini. After the AI processes the anonymized content, PrivateProxy reinjects the original data back — ensuring **zero data leakage**.
+Moretta is a self-hosted proxy for secure AI usage in enterprise environments. It automatically detects and anonymizes confidential data (PII) from uploaded documents before sending them to external AI models. After the AI processes the anonymized text, Moretta reinjects the original data back. This ensures no data leakage outside your local network.
 
 ## How It Works
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     CORPORATE NETWORK                           │
-│                                                                 │
-│  ┌──────────┐    ┌───────────────────────────────────────┐      │
-│  │ Employee  │───▶│  PrivateProxy (local server)          │      │
-│  │ uploads   │    │                                       │      │
-│  │ file      │    │  1. Parse DOCX/XLSX/EML               │      │
-│  │ (DOCX,    │    │  2. Detect PII (Presidio + Ollama)    │      │
-│  │  XLSX,    │    │  3. Replace PII → UUID tokens          │      │
-│  │  EML)     │    │  4. Store mapping in encrypted vault   │      │
-│  └──────────┘    └──────────┬────────────────────────────┘      │
-│                              │                                   │
-│                              │ Only anonymized text              │
-│                              ▼                                   │
-│  ┌──────────┐    ┌───────────────────────────────────────┐      │
-│  │ Employee  │◀───│  PrivateProxy (reinjektion)           │      │
-│  │ downloads │    │                                       │      │
-│  │ result    │    │  7. Replace tokens → original PII      │      │
-│  │           │    │  8. Verify all tokens resolved          │      │
-│  └──────────┘    └──────────┬────────────────────────────┘      │
-│                              ▲                                   │
-└──────────────────────────────┼───────────────────────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │  External AI API     │
-                    │  (Claude/GPT/Gemini) │
-                    │                      │
-                    │  5. Process anon text │
-                    │  6. Return result     │
-                    └─────────────────────┘
-
-     ⚠️  Confidential data NEVER leaves the corporate network
-```
+1. User uploads a DOCX, XLSX, or EML file.
+2. System parses the file and detects PII using Microsoft Presidio and a local Ollama model.
+3. PII is replaced with UUID tokens and the mapping is saved in an encrypted local database.
+4. Anonymized text is sent to an external AI API (Claude, GPT, Gemini).
+5. The AI processes the text and returns the result.
+6. The system replaces UUID tokens back to the original PII.
+7. User downloads the final result.
 
 ## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- (Optional) NVIDIA GPU for faster local model inference
+- Docker and Docker Compose
 
-### Run
+### Windows
+Double-click the start.bat file in the project directory.
 
+### Linux and macOS
+Run the startup script in your terminal:
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/privateproxy.git
-cd privateproxy
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — set VAULT_ENCRYPTION_KEY and at least one AI provider API key
-
-# 3. Start all services
-docker-compose up -d
-
-# 4. Pull the local model (first run only)
-docker exec privateproxy-ollama ollama pull mistral:7b
-
-# 5. Open the UI
-# Navigate to http://localhost:3000
+chmod +x start.sh
+./start.sh
 ```
 
-## Configuration
+Navigate to http://localhost:3000 to use the application.
+Configure API keys and vault encryption key in the .env file.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LOCAL_MODEL` | Local Ollama model for PII detection | `mistral:7b` |
-| `OLLAMA_URL` | Ollama API endpoint | `http://ollama:11434` |
-| `VAULT_ENCRYPTION_KEY` | 32-char key for SQLite vault encryption | *(required)* |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | *(optional)* |
-| `OPENAI_API_KEY` | OpenAI API key for GPT models | *(optional)* |
-| `GOOGLE_AI_API_KEY` | Google AI API key for Gemini | *(optional)* |
-| `DEFAULT_PROVIDER` | Default AI provider (`claude`/`openai`/`gemini`) | `claude` |
-| `DEFAULT_AI_MODEL` | Default model name | `claude-sonnet-4-20250514` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-| `DATA_DIR` | Data directory for vault and logs | `/app/data` |
+## Configuration (.env)
+
+Variable | Default | Description
+--- | --- | ---
+LOCAL_MODEL | phi4-mini | Local Ollama model for PII detection
+OLLAMA_URL | http://ollama:11434 | Ollama API endpoint
+VAULT_ENCRYPTION_KEY | | 32-character key for SQLite encryption
+DEFAULT_PROVIDER | claude | Default AI provider
+DEFAULT_AI_MODEL | claude-sonnet-4 | Default model name
 
 ## Local Models
 
-| Model | RAM Required | GPU | Quality | Notes |
-|-------|-------------|-----|---------|-------|
-| `mistral:7b` | 8 GB | Recommended | ★★★★☆ | Best balance of speed & quality |
-| `phi3:mini` | 4 GB | Not required | ★★★☆☆ | CPU-friendly, lighter |
-| `llama3:8b` | 8 GB | Recommended | ★★★★★ | Highest quality, slower |
-| `gemma:7b` | 8 GB | Recommended | ★★★★☆ | Good alternative |
+You can change the model by setting the LOCAL_MODEL variable in your .env file.
 
-Change the model by setting `LOCAL_MODEL` in your `.env` file.
+Model | RAM Required | Notes
+--- | --- | ---
+phi4-mini | 4 GB | Recommended. Fast and perfect for logic tasks.
+deepseek-r1:8b | 8 GB | Advanced reasoning.
+qwen2.5:7b | 8 GB | Capable all-rounder model.
+llama3.3:8b | 8 GB | Reliable baseline model.
 
 ## Architecture
 
-- **Backend**: Python 3.11 + FastAPI
-- **PII Detection**: Microsoft Presidio (deterministic) + Ollama (contextual LLM)
-- **Vault**: SQLite with encryption for PII ↔ token mappings
-- **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS
-- **Infrastructure**: Docker Compose (3 services)
-
-## Security
-
-1. **No PII in logs** — only types and counts are logged
-2. **Encrypted vault** — SQLite DB encrypted with PRAGMA key
-3. **Temp file cleanup** — files deleted after task completion
-4. **CORS restriction** — localhost only
-5. **No external calls** — except explicit AI provider API calls (audited)
-6. **UUID tokens** — impossible for external AI to guess original values
+- Backend: Python 3.11 with FastAPI
+- PII Detection: Microsoft Presidio and Ollama
+- Vault: Encrypted SQLite database
+- Frontend: React 18, Vite, TypeScript, Tailwind CSS
+- Infrastructure: Docker Compose
 
 ## License
-
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License

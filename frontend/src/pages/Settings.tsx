@@ -175,10 +175,10 @@ DEFAULT_PROVIDER=claude`}
               </thead>
               <tbody>
                 {[
-                  { name: 'mistral:7b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★☆', active: true },
-                  { name: 'phi3:mini', ram: '4 GB', gpu: 'Nie wymagany', quality: '★★★☆☆', active: false },
-                  { name: 'llama3:8b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★★', active: false },
-                  { name: 'gemma:7b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★☆', active: false },
+                  { name: 'phi4-mini', ram: '4 GB', gpu: 'Nie wymagany', quality: '★★★★★', active: true, recommended: true, desc: 'Lekki i potężny (3.8B), świetny w rozumowaniu' },
+                  { name: 'deepseek-r1:8b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★★', active: false, recommended: false, desc: 'Zaawansowane myślenie (CoT), wybitny w PII i logice' },
+                  { name: 'qwen2.5:7b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★★', active: false, recommended: false, desc: 'Najlepszy model uniwersalny (7B) dzisiejszych czasów' },
+                  { name: 'llama3.3:8b', ram: '8 GB', gpu: 'Zalecany', quality: '★★★★☆', active: false, recommended: false, desc: 'Niezawodny i szybki standard od firmy Meta' },
                 ].map((model) => (
                   <tr
                     key={model.name}
@@ -186,13 +186,23 @@ DEFAULT_PROVIDER=claude`}
                       model.active ? 'bg-pp-green/10' : 'hover:bg-pp-surface-light'
                     }`}
                   >
-                    <td className="px-5 py-3 font-mono text-white">
-                      {model.name}
-                      {model.active && (
-                        <span className="ml-2 text-xs bg-pp-accent/30 text-pp-green-text px-2 py-0.5 rounded-full">
-                          aktywny
-                        </span>
-                      )}
+                    <td className="px-5 py-3 font-mono text-white flex items-center flex-wrap gap-2">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          {model.name}
+                          {model.recommended && (
+                            <span className="text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                              🔥 Najlepszy wybór
+                            </span>
+                          )}
+                          {model.active && (
+                            <span className="text-xs bg-pp-accent/30 text-pp-green-text border border-pp-accent/50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                              aktywny
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-pp-text-muted mt-1 font-sans">{model.desc}</span>
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-pp-text">{model.ram}</td>
                     <td className="px-5 py-3 text-pp-text">{model.gpu}</td>
