@@ -166,7 +166,7 @@
             font-weight: 400;
             color: var(--white);
             letter-spacing: 0.12em;
-            line-height: 0.95;
+            line-height: 1.1; /* Increased line-height for better wrapping */
             margin-bottom: 12px;
             z-index: 1;
             opacity: 0;
@@ -507,6 +507,7 @@
             line-height: 2.1;
             color: var(--white3);
             margin-bottom: 36px;
+            overflow-x: auto;
         }
 
         .terminal::before {
@@ -704,6 +705,113 @@
         .reveal.visible {
             opacity: 1;
             transform: translateY(0);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 992px) {
+            .flow {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+                margin: 10px 0;
+            }
+
+            .problem-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            nav {
+                padding: 20px 24px;
+                flex-direction: column;
+                gap: 16px;
+                background: rgba(7, 6, 10, 0.95);
+            }
+
+            .nav-links {
+                gap: 20px;
+            }
+
+            .hero {
+                padding: 120px 24px 60px;
+            }
+
+            .section {
+                padding: 60px 24px;
+            }
+
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stat {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .stat:last-child {
+                border-bottom: none;
+            }
+
+            .model-table-container {
+                overflow-x: auto;
+                margin-bottom: 32px;
+                border: 1px solid var(--border);
+            }
+
+            .model-table {
+                min-width: 600px;
+                margin-bottom: 0;
+                border: none;
+            }
+
+            .footer-container {
+                flex-direction: column;
+                gap: 32px;
+                text-align: center;
+                padding: 40px 24px !important;
+            }
+
+            .footer-container > div:last-child {
+                text-align: center !important;
+            }
+
+            footer {
+                flex-direction: column;
+                gap: 24px;
+                padding: 40px 24px;
+                text-align: center;
+            }
+
+            .footer-links {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: clamp(48px, 15vw, 64px);
+            }
+
+            .hero-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn-primary, .btn-secondary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .nav-links {
+                gap: 12px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -978,7 +1086,8 @@
             <p
                 style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-dim);margin-bottom:16px">
                 Local anonymisation model &mdash; runs on your server, data never leaves</p>
-            <table class="model-table" style="margin-bottom:32px">
+            <div class="model-table-container">
+            <table class="model-table">
                 <thead>
                     <tr>
                         <th>Model</th>
@@ -1040,10 +1149,12 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <p
                 style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-dim);margin-bottom:16px">
                 External AI providers &mdash; receive only masked tokens, never real data</p>
+            <div class="model-table-container">
             <table class="model-table">
                 <thead>
                     <tr>
@@ -1106,6 +1217,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
             <p
                 style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white3);margin-top:10px;letter-spacing:0.05em">
                 Pricing as of March 2026 &middot; Sources: docs.anthropic.com &middot; platform.openai.com &middot;
@@ -1140,7 +1252,7 @@
     </div>
 
     <!-- ── FOOTER ── -->
-    <div
+    <div class="footer-container"
         style="border-top:1px solid var(--border);padding:48px 56px;display:flex;align-items:center;justify-content:space-between;background:var(--bg2)">
         <div>
             <p
