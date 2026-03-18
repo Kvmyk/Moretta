@@ -27,15 +27,17 @@
   ],
   "users": [
     {
-      "username": "moretta.admin",
+      "username": "JakubAdmin",
       "enabled": true,
+      "email": "admin@moretta.local",
       "emailVerified": true,
       "firstName": "Moretta",
       "lastName": "Admin",
+      "requiredActions": ["UPDATE_PASSWORD"],
       "credentials": [
         {
           "type": "password",
-          "value": "ChangeMe123!",
+          "value": "changePass",
           "temporary": true
         }
       ]
