@@ -51,5 +51,6 @@ echo ==============================================
 echo [SUKCES] Środowisko zostało uruchomione!
 echo Interfejs użytkownika (Frontend): http://localhost:3000
 echo API (Backend): http://localhost:8000
+echo Keycloak (SSO): http://localhost:3000/auth
 echo ==============================================
 pause

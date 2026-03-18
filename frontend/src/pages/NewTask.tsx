@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import PiiDetectionCard from '../components/PiiDetectionCard';
 import ProviderSelector from '../components/ProviderSelector';
+import { apiFetch } from '../auth/apiFetch';
 
 interface PiiType {
   type: string;
@@ -126,11 +127,11 @@ function NewTask() {
       if (selectedFile) {
         const formData = new FormData();
         formData.append('file', selectedFile);
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
         if (!res.ok) throw new Error('Upload failed');
         return res.json() as Promise<UploadResult>;
       } else if (inputText.trim()) {
-        const res = await fetch('/api/text', {
+        const res = await apiFetch('/api/text', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: inputText }),
@@ -151,7 +152,7 @@ function NewTask() {
   const piiQuery = useQuery<PiiResult>({
     queryKey: ['pii', fileId],
     queryFn: async () => {
-      const res = await fetch(`/api/file/${fileId}/pii`);
+      const res = await apiFetch(`/api/file/${fileId}/pii`);
       if (!res.ok) throw new Error('Failed to fetch PII');
       return res.json();
     },
@@ -166,7 +167,7 @@ function NewTask() {
   const previewQuery = useQuery<PreviewResult>({
     queryKey: ['preview', fileId],
     queryFn: async () => {
-      const res = await fetch(`/api/file/${fileId}/preview`);
+      const res = await apiFetch(`/api/file/${fileId}/preview`);
       if (!res.ok) throw new Error('Failed to fetch preview');
       return res.json();
     },
@@ -180,7 +181,7 @@ function NewTask() {
   const resultQuery = useQuery<{ task_id: string; status: string; filename: string; messages: Array<{role: string, content: string}>; has_solution?: boolean; result_preview?: any }>({
     queryKey: ['result', taskId],
     queryFn: async () => {
-      const res = await fetch(`/api/task/${taskId}/result`);
+      const res = await apiFetch(`/api/task/${taskId}/result`);
       if (!res.ok) throw new Error('Result fetch failed');
       return res.json();
     },
@@ -190,7 +191,7 @@ function NewTask() {
   // Chat mutation for multi-turn
   const sendChatMutation = useMutation({
     mutationFn: async (chatInstruction: string) => {
-      const res = await fetch(`/api/task/${taskId}/chat`, {
+      const res = await apiFetch(`/api/task/${taskId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instruction: chatInstruction }),
@@ -225,7 +226,7 @@ function NewTask() {
   // Create task
   const createTaskMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/task', {
+      const res = await apiFetch('/api/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -257,7 +258,7 @@ function NewTask() {
   const pollTaskStatus = useCallback(async (tid: string) => {
     const poll = async () => {
       try {
-        const res = await fetch(`/api/task/${tid}/status`);
+        const res = await apiFetch(`/api/task/${tid}/status`);
         const data = await res.json();
         setTaskStatus(data.status);
         if (data.status === 'processing') {
@@ -299,7 +300,7 @@ function NewTask() {
   const handleDownloadResult = async () => {
     if (!taskId) return;
     try {
-      const res = await fetch(`/api/task/${taskId}/download`);
+      const res = await apiFetch(`/api/task/${taskId}/download`);
       if (!res.ok) throw new Error('Download failed');
       
       const blob = await res.blob();

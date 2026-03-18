@@ -184,13 +184,26 @@ class PiiDetector:
         fragment = text[:MAX_CHARS] if len(text) > MAX_CHARS else text
 
         prompt = (
-            "Przeanalizuj poniższy tekst biznesowy pod kątem wycieków danych (Data Leak Prevention). "
-            "Zwróć w formacie JSON listę poufnych informacji, takich jak nazwy tajnych projektów, "
-            "kwoty finansowe powiązane z osobami, wewnętrzne ID, czy stanowiska zarządu ukryte w tekście. "
-            "UWAGA: Pomiń standardowe rzeczy jak PESEL czy NIP, szukaj tylko nieoczywistych, dających się powiązać z osobą danych.\n\n"
-            "Format wyjściowy (zawsze jako poprawna tablica JSON, NIC WIECEJ):\n"
-            '[{"text": "znaleziony fragment", "type": "OTHER_PII", "start": N, "end": N}]\n\n'
-            "Jeśli nie znajdziesz żadnych poufnych danych, zwróć dokładnie: []\n\n"
+            "Jesteś rygorystycznym, automatycznym systemem DLP (Data Leak Prevention). Zewnętrzny system przetwarza już standardowe dane jak PESEL, NIP, numery telefonów czy IBAN - zignoruj je.\n\n"
+            "Twoim JEDYNYM zadaniem jest znalezienie i wyodrębnienie w tekście niestandardowych, ryzykownych danych biznesowych:\n"
+            '1. "SECRET_PROJECT": Kryptonimy, nazwy tajnych projektów wewnętrznych i inicjatyw.\n'
+            '2. "FINANCE": Kwoty finansowe (wynagrodzenia, premie, wyceny, kary) powiązane bezpośrednio z konkretnymi celami lub osobami.\n'
+            '3. "INTERNAL_ID": Wewnętrzne identyfikatory, numery umów, numeracje faktur, zamówień.\n'
+            '4. "IT_INFRA": Adresy IP, nazwy prywatnych serwerów, wewnętrzne adresy URL maszyn.\n'
+            '5. "PERSON": Imiona i nazwiska, ale *tylko* jeśli występują w ryzykownym, niejawnym kontekście (np. listy zwolnień, tajne premie).\n\n'
+            "ZASADY KRYTYCZNE (ZŁAMANIE ICH BĘDZIE SKUTKOWAĆ AWARIĄ SYSTEMU):\n"
+            "- MUSISZ odpowiedzieć WYŁĄCZNIE i ZAWSZE jako surowa techniczna tablica JSON.\n"
+            '- ZABRONIONE jest dodawanie JAKIEGOKOLWIEK tekstu poza JSON-em (żadnych słów typu "Oto wynik", "Zrozumiałem", żadnych uwag).\n'
+            "- ZABRONIONE jest używanie znaczników markdown (np. ```json). Odpowiedź musi zaczynać się jawnie od znaku `[` i kończyć na `]`.\n"
+            '- Zwracane klucze w każdym obiekcie JSON to: "text" (dokładny znaleziony fragment z tekstu), "type" (odpowiednia kategoria z listy powyżej).\n\n'
+            "Przykładowa pożądana odpowiedź:\n"
+            "[\n"
+            '  {"text": "Projekt Apollo", "type": "SECRET_PROJECT"},\n'
+            '  {"text": "10.0.0.5", "type": "IT_INFRA"},\n'
+            '  {"text": "FV-2024/03/991", "type": "INTERNAL_ID"}\n'
+            "]\n\n"
+            "Jeśli w tekście nie ma ŻADNYCH z tych poufnych danych, Twoja cała odpowiedź musi składać się WYŁĄCZNIE Z DWÓCH ZNAKÓW:\n"
+            "[]\n\n"
             f"Tekst:\n{fragment}"
         )
 
@@ -242,5 +255,5 @@ class PiiDetector:
             return new_results
 
         except Exception as exc:
-            logger.warning(f"Ollama deep scan failed: {exc}")
+            logger.exception("Ollama deep scan failed:")
             return []

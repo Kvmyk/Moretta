@@ -14,6 +14,7 @@ services:
       - ./data:/app/data
     depends_on:
       - ollama
+      - keycloak
     restart: unless-stopped
     networks:
       - privateproxy-net
@@ -22,11 +23,16 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:3000/auth}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-moretta}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-moretta-frontend}
     container_name: privateproxy-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
+      - keycloak
     restart: unless-stopped
     networks:
       - privateproxy-net
@@ -38,6 +44,24 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - privateproxy-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: privateproxy-keycloak
+    command: start-dev --import-realm --http-port=8080
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME: http://localhost:3000
+      KC_HTTP_RELATIVE_PATH: /auth
+    volumes:
+      - ./keycloak/realm-moretta.json:/opt/keycloak/data/import/realm-moretta.json:ro
+      - ./keycloak/themes/moretta:/opt/keycloak/themes/moretta:ro
     restart: unless-stopped
     networks:
       - privateproxy-net

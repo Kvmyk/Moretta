@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../auth/apiFetch';
 
 interface Task {
   task_id: string;
@@ -13,7 +14,7 @@ function History() {
   const { data, isLoading } = useQuery<{ tasks: Task[] }>({
     queryKey: ['tasks'],
     queryFn: async () => {
-      const res = await fetch('/api/tasks');
+      const res = await apiFetch('/api/tasks');
       if (!res.ok) throw new Error('Failed to fetch tasks');
       return res.json();
     },
@@ -54,7 +55,7 @@ function History() {
 
   const handleDownload = async (taskId: string, filename: string) => {
     try {
-      const res = await fetch(`/api/task/${taskId}/download`);
+      const res = await apiFetch(`/api/task/${taskId}/download`);
       if (!res.ok) throw new Error('Download failed');
       
       const blob = await res.blob();

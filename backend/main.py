@@ -7,6 +7,7 @@ AI processing, and result retrieval.
 from __future__ import annotations
 
 import asyncio
+import tempfile
 import logging
 import os
 import uuid
@@ -15,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -33,6 +34,7 @@ from parsers.email_parser import parse_email
 from rebuilders import rebuild_xlsx, rebuild_docx
 from providers.base import get_provider
 from audit.audit_log import AuditLogger
+from auth import AuthConfig, AuthError, OIDCValidator
 
 # ── Setup ──────────────────────────────────────────────────────────
 
@@ -67,6 +69,17 @@ guard = SecurityGuard(settings.ollama_url, settings.local_model)
 replacer = PiiReplacer()
 reinjektor = Reinjektor()
 
+auth_validator = OIDCValidator(
+    AuthConfig(
+        issuer_url=settings.sso_issuer_url,
+        allowed_client_ids=[
+            client_id.strip()
+            for client_id in settings.sso_allowed_client_ids.split(",")
+            if client_id.strip()
+        ],
+    )
+)
+
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -93,6 +106,28 @@ async def startup_event() -> None:
     settings.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
     vault.initialize()
     logger.info("PrivateProxy backend started")
+
+
+@app.middleware("http")
+async def require_sso_token(request: Request, call_next):
+    """Require valid bearer token for all API endpoints when SSO is enabled."""
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    if settings.sso_enabled and request.url.path.startswith("/api/"):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            print(f"Auth failed: Missing bearer token for {request.url.path}")
+            return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
+
+        token = auth_header.removeprefix("Bearer ").strip()
+        try:
+            request.state.user = auth_validator.validate(token)
+        except AuthError as exc:
+            print(f"AuthError validating token: {exc}")
+            return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    return await call_next(request)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────
@@ -123,9 +158,8 @@ async def upload_file(file: UploadFile = File(...), background_tasks: Background
         )
 
     file_id = str(uuid.uuid4())
-    save_path = settings.upload_dir / f"{file_id}{ext}"
-
     contents = await file.read()
+    save_path = settings.upload_dir / f"{file_id}{ext}"
     save_path.write_bytes(contents)
 
     # Parse file text and structure
@@ -136,16 +170,20 @@ async def upload_file(file: UploadFile = File(...), background_tasks: Background
     except Exception as exc:
         save_path.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Failed to parse file: {exc}")
+    finally:
+        # Remove plaintext copy from disk right after parse.
+        save_path.unlink(missing_ok=True)
 
     # Detect PII (Stage 1: Presidio, Stage 2: Ollama)
     pii_results = await detector.detect(text)
 
     file_store[file_id] = {
-        "path": str(save_path),
+        "path": None,
         "filename": filename,
         "ext": ext,
         "text": text,
         "preview_data": preview_data,
+        "original_bytes": contents,
         "pii": pii_results,
         "deep_scan_completed": False,
         "size_bytes": len(contents),
@@ -190,17 +228,16 @@ async def process_text(request: TextInputRequest, background_tasks: BackgroundTa
     pii_results = await detector.detect(text)
     preview_data = {"type": "document", "text": text}
 
-    # Save to store
+    # Keep text in memory only (do not persist plaintext to uploads).
     file_bytes = text.encode("utf-8")
-    save_path = settings.upload_dir / f"{file_id}{ext}"
-    save_path.write_bytes(file_bytes)
 
     file_store[file_id] = {
-        "path": str(save_path),
+        "path": None,
         "filename": filename,
         "ext": ext,
         "text": text,
         "preview_data": preview_data,
+        "original_bytes": file_bytes,
         "pii": pii_results,
         "deep_scan_completed": False,
         "size_bytes": len(file_bytes),
@@ -505,11 +542,21 @@ async def download_task_result(task_id: str):
                 text = msg["content"].strip()
                 break
 
-    # Get original path for template
+    # Recreate template as temporary file only for rebuild, then delete.
     file_id = task["file_id"]
-    template_path = file_store[file_id]["path"] if file_id in file_store else None
+    info = file_store.get(file_id, {})
+    template_bytes = info.get("original_bytes")
 
     try:
+        template_path = None
+        temp_file = None
+        if ext in {".xlsx", ".docx"} and template_bytes:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+            temp_file.write(template_bytes)
+            temp_file.flush()
+            temp_file.close()
+            template_path = temp_file.name
+
         if ext == ".xlsx":
             content_bytes = rebuild_xlsx(text, template_path=template_path)
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -533,6 +580,9 @@ async def download_task_result(task_id: str):
     except Exception as exc:
         logger.exception(f"Task {task_id}: Failed to rebuild file")
         raise HTTPException(status_code=500, detail=f"Failed to rebuild file: {exc}")
+    finally:
+        if "temp_file" in locals() and temp_file:
+            Path(temp_file.name).unlink(missing_ok=True)
 
 
 @app.get("/api/audit")
@@ -776,27 +826,34 @@ _LABEL_MAP = {
     "DATE_TIME": "Date",
     "CREDIT_CARD": "Credit Card",
     "CRYPTO": "Crypto Address",
+    "SECRET_PROJECT": "Secret Project",
+    "FINANCE": "Financial Amount",
+    "INTERNAL_ID": "Internal ID",
+    "IT_INFRA": "IT Infrastructure",
     "SALARY": "Salary Amounts",
     "FINANCIAL": "Financial Data",
     "PROJECT_ID": "Project Code",
     "CLIENT_NAME": "Client Name",
     "CONTRACT_NUMBER": "Contract Number",
-    "INTERNAL_ID": "Internal ID",
     "IP_ADDRESS": "IP Address",
 }
 
 _SEVERITY_MAP = {
+    "SECRET_PROJECT": "critical",
+    "FINANCE": "warning",
+    "INTERNAL_ID": "warning",
+    "IT_INFRA": "critical",
     "PERSON": "critical",
     "NRP": "critical",
     "PESEL": "critical",
     "NIP": "critical",
     "CREDIT_CARD": "critical",
     "IBAN_CODE": "critical",
-    "EMAIL_ADDRESS": "critical",
-    "PHONE_NUMBER": "critical",
+    "EMAIL_ADDRESS": "warning",
+    "PHONE_NUMBER": "warning",
     "SALARY": "warning",
     "FINANCIAL": "warning",
-    "LOCATION": "warning",
+    "LOCATION": "info",
     "CLIENT_NAME": "warning",
     "CONTRACT_NUMBER": "warning",
 }

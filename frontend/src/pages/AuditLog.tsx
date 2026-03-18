@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../auth/apiFetch';
 
 interface AuditEntry {
   timestamp: string;
@@ -21,7 +22,7 @@ function AuditLog() {
   const { data, isLoading } = useQuery<{ entries: AuditEntry[]; total: number }>({
     queryKey: ['audit', limit, offset],
     queryFn: async () => {
-      const res = await fetch(`/api/audit?limit=${limit}&offset=${offset}`);
+      const res = await apiFetch(`/api/audit?limit=${limit}&offset=${offset}`);
       if (!res.ok) throw new Error('Failed to fetch audit log');
       return res.json();
     },
@@ -60,7 +61,7 @@ function AuditLog() {
 
   const handleExportCSV = async () => {
     try {
-      const res = await fetch('/api/audit?limit=10000&offset=0');
+      const res = await apiFetch('/api/audit?limit=10000&offset=0');
       const allData = await res.json();
       if (!allData.entries?.length) return;
 

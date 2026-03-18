@@ -22,3 +22,4 @@ google-generativeai>=0.8.0
 # Utilities
 python-dotenv>=1.0.0
 pydantic-settings>=2.0.0
+PyJWT[crypto]>=2.9.0

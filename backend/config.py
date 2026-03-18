@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     data_dir: str = "/app/data"
 
+    # ── SSO / OIDC ───────────────────────────────────────────────
+    sso_enabled: bool = True
+    sso_issuer_url: str = "http://keycloak:8080/auth/realms/moretta"
+    sso_allowed_client_ids: str = "moretta-frontend"
+
     # ── Derived Paths ─────────────────────────────────────────────
     @property
     def vault_path(self) -> Path:

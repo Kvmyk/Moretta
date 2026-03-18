@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../auth/apiFetch';
 
 interface Model {
   id: string;
@@ -41,7 +42,7 @@ function ProviderSelector({ provider, model, onProviderChange, onModelChange }: 
   const { data } = useQuery<ProvidersResponse>({
     queryKey: ['providers'],
     queryFn: async () => {
-      const res = await fetch('/api/providers');
+      const res = await apiFetch('/api/providers');
       if (!res.ok) throw new Error('Failed to fetch providers');
       return res.json();
     },
