@@ -683,7 +683,9 @@
 
         .mask-svg {
             animation: maskFloat 7s ease-in-out infinite;
-            filter: drop-shadow(0 0 40px rgba(100, 80, 160, 0.12));
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.45));
+            will-change: transform;
+            transition: width 0.3s, height 0.3s;
         }
 
         .mask-shadow {
@@ -702,11 +704,9 @@
         @keyframes maskFloat {
             0%, 100% {
                 transform: translateY(0px);
-                filter: drop-shadow(0 4px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 50px rgba(100, 80, 160, 0.12));
             }
             50% {
                 transform: translateY(-18px);
-                filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 80px rgba(120, 95, 180, 0.22));
             }
         }
 
@@ -738,11 +738,11 @@
             100% { transform: translateY(80px) translateX(0) scale(3.2); opacity: 0; }
         }
         .steam-wisp {
-            filter: blur(9px);
             opacity: 0;
             pointer-events: none;
             transform-box: fill-box;
             transform-origin: center;
+            will-change: transform, opacity;
         }
         .wisp-1 { animation: steamRiseL 7s infinite ease-in-out; animation-delay: 0s; }
         .wisp-2 { animation: steamRiseC 7s infinite ease-in-out; animation-delay: 1s; }
@@ -850,6 +850,15 @@
                 font-size: clamp(48px, 15vw, 64px);
             }
 
+            .mask-svg {
+                width: 130px;
+                height: 180px;
+            }
+
+            .mask-shadow {
+                width: 80px;
+            }
+
             .hero-actions {
                 flex-direction: column;
                 width: 100%;
@@ -923,10 +932,11 @@
                         <stop offset="100%" stop-color="rgba(200, 190, 240, 0)" />
                     </radialGradient>
 
-                    <!-- Steam/Mist material (Realistic soft cloud) -->
+                    <!-- Steam/Mist material (Softer gradients for performance - no blur filter needed) -->
                     <radialGradient id="g-steam" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="rgba(255, 255, 255, 0.6)" />
-                        <stop offset="40%" stop-color="rgba(255, 255, 255, 0.2)" />
+                        <stop offset="0%" stop-color="rgba(255, 255, 255, 0.35)" />
+                        <stop offset="30%" stop-color="rgba(255, 255, 255, 0.15)" />
+                        <stop offset="70%" stop-color="rgba(255, 255, 255, 0.05)" />
                         <stop offset="100%" stop-color="rgba(255, 255, 255, 0)" />
                     </radialGradient>
 

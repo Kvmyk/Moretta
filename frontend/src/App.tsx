@@ -5,20 +5,31 @@ import Dashboard from './pages/Dashboard';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import keycloak from './auth/keycloak';
-import Logo from './components/Logo';
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="flex h-screen bg-pp-bg text-pp-text">
+      <div className="flex h-screen bg-pp-bg text-pp-text flex-col md:flex-row">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center justify-between p-4 bg-pp-surface border-b border-pp-border sticky top-0 z-50">
+          <NavLink to="/" className="hover:opacity-80 transition-opacity">
+            <h1 style={{ fontFamily: "'Cinzel', serif" }} className="text-lg font-bold tracking-[0.25em] text-[#ede8f2] uppercase">
+              Moretta
+            </h1>
+          </NavLink>
+          <div className="text-xs text-pp-text-muted">{keycloak.tokenParsed?.preferred_username}</div>
+        </header>
+
         {/* Sidebar */}
-        <aside className="w-64 bg-pp-surface border-r border-pp-border flex flex-col shrink-0">
+        <aside className="hidden md:flex w-64 bg-pp-surface border-r border-pp-border flex-col shrink-0">
           {/* Logo */}
           <div className="p-6 border-b border-pp-border">
-            <NavLink to="/" className="hover:opacity-90 transition-opacity inline-block">
-              <Logo size={40} showText />
+            <NavLink to="/" className="hover:opacity-80 transition-opacity">
+              <h1 style={{ fontFamily: "'Cinzel', serif" }} className="text-xl font-bold tracking-[0.35em] text-[#ede8f2] uppercase leading-none mb-2">
+                Moretta
+              </h1>
             </NavLink>
-            <p className="text-[9px] text-pp-accent-light opacity-60 mt-2 uppercase tracking-[0.25em] font-medium ml-[52px]">v0.7 Early Access</p>
+            <p className="text-[9px] text-pp-accent-light opacity-50 uppercase tracking-[0.25em] font-medium">v0.7 SELF-HOSTED</p>
             <div className="mt-4 text-xs text-pp-text-muted">
               <div className="truncate">{keycloak.tokenParsed?.preferred_username ?? 'authenticated-user'}</div>
               <button
