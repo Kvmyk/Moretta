@@ -66,6 +66,12 @@ body.login-pf,
   text-transform: uppercase;
   color: #ede8f2;
   text-align: center;
+  position: relative;
+  left: 10px;
+  /* <--- Shift only the text left */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 #kc-header-wrapper::before {
@@ -73,11 +79,25 @@ body.login-pf,
   display: block;
   width: 180px;
   height: 250px;
-  margin: 0 auto 1.5rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 180 250' fill='none'%3E%3Cdefs%3E%3CradialGradient id='gf' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0%25' stop-color='%23322a40'/%3E%3Cstop offset='40%25' stop-color='%231f1a29'/%3E%3Cstop offset='75%25' stop-color='%23110e17'/%3E%3Cstop offset='100%25' stop-color='%23050407'/%3E%3C/radialGradient%3E%3CradialGradient id='g-form' cx='50%25' cy='40%25' r='70%25' fx='50%25' fy='30%25'%3E%3Cstop offset='0%25' stop-color='rgba(180, 160, 220, 0.08)'/%3E%3Cstop offset='40%25' stop-color='rgba(180, 160, 220, 0.02)'/%3E%3Cstop offset='100%25' stop-color='rgba(180, 160, 220, 0)'/%3E%3C/radialGradient%3E%3ClinearGradient id='g-rim' x1='0%25' y1='0%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='rgba(200, 190, 240, 0.22)'/%3E%3Cstop offset='15%25' stop-color='rgba(200, 190, 240, 0.04)'/%3E%3Cstop offset='50%25' stop-color='rgba(200, 190, 240, 0)'/%3E%3Cstop offset='85%25' stop-color='rgba(200, 190, 240, 0.04)'/%3E%3Cstop offset='100%25' stop-color='rgba(200, 190, 240, 0.22)'/%3E%3C/linearGradient%3E%3ClinearGradient id='g-eye' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23020103'/%3E%3Cstop offset='100%25' stop-color='%23161221'/%3E%3C/linearGradient%3E%3CradialGradient id='g-nose' cx='50%25' cy='45%25' r='40%25' fx='50%25' fy='35%25'%3E%3Cstop offset='0%25' stop-color='rgba(200, 190, 240, 0.07)'/%3E%3Cstop offset='25%25' stop-color='rgba(200, 190, 240, 0.03)'/%3E%3Cstop offset='100%25' stop-color='rgba(200, 190, 240, 0)'/%3E%3C/radialGradient%3E%3CradialGradient id='g-mouth' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%23000'/%3E%3Cstop offset='80%25' stop-color='%230a080d'/%3E%3Cstop offset='100%25' stop-color='%2315121b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23gf)'/%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23g-form)'/%3E%3Cellipse cx='100' cy='95' rx='8' ry='40' fill='url(%23g-nose)'/%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' stroke='url(%23g-rim)' stroke-width='2'/%3E%3Cellipse cx='100' cy='150' rx='10' ry='3' fill='url(%23g-mouth)'/%3E%3Cpath d='M91.5 151.2 Q100 153.2, 108.5 151.2' stroke='rgba(200, 190, 240, 0.12)' stroke-width='0.8'/%3E%3Cpath d='M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z' fill='url(%23g-eye)'/%3E%3Cpath d='M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z' fill='url(%23g-eye)'/%3E%3C/svg%3E");
+  margin: 0 auto 0.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 180 250' fill='none'%3E%3Cdefs%3E%3CradialGradient id='gf' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0%25' stop-color='%23322a40'/%3E%3Cstop offset='40%25' stop-color='%231f1a29'/%3E%3Cstop offset='75%25' stop-color='%23110e17'/%3E%3Cstop offset='100%25' stop-color='%23050407'/%3E%3C/radialGradient%3E%3CradialGradient id='g-form' cx='50%25' cy='40%25' r='70%25' fx='50%25' fy='30%25'%3E%3Cstop offset='0%25' stop-color='rgba(180, 160, 220, 0.08)'/%3E%3Cstop offset='40%25' stop-color='rgba(180, 160, 220, 0.02)'/%3E%3Cstop offset='100%25' stop-color='rgba(180, 160, 220, 0)'/%3E%3C/radialGradient%3E%3ClinearGradient id='g-rim' x1='0%25' y1='0%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='rgba(200, 190, 240, 0.22)'/%3E%3Cstop offset='15%25' stop-color='rgba(200, 190, 240, 0.04)'/%3E%3Cstop offset='50%25' stop-color='rgba(200, 190, 240, 0)'/%3E%3Cstop offset='85%25' stop-color='rgba(200, 190, 240, 0.04)'/%3E%3Cstop offset='100%25' stop-color='rgba(200, 190, 240, 0.22)'/%3E%3C/linearGradient%3E%3ClinearGradient id='g-eye' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23020103'/%3E%3Cstop offset='100%25' stop-color='%23161221'/%3E%3C/linearGradient%3E%3CradialGradient id='g-nose' cx='50%25' cy='45%25' r='40%25' fx='50%25' fy='35%25'%3E%3Cstop offset='0%25' stop-color='rgba(200, 190, 240, 0.07)'/%3E%3Cstop offset='25%25' stop-color='rgba(200, 190, 240, 0.03)'/%3E%3Cstop offset='100%25' stop-color='rgba(200, 190, 240, 0)'/%3E%3C/radialGradient%3E%3CradialGradient id='g-mouth' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%23000'/%3E%3Cstop offset='80%25' stop-color='%230a080d'/%3E%3Cstop offset='100%25' stop-color='%2315121b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23gf)'/%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23g-form)'/%3E%3Cellipse cx='100' cy='95' rx='8' ry='40' fill='url(%23g-nose)'/%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' stroke='url(%23g-rim)' stroke-width='2' fill='none'/%3E%3Cpath d='M100 13 C75 13,49 32,39 61 C29 88,29 113,39 137 C49 161,71 176,86 181 C94 184,106 184,114 181 C129 176,151 161,161 137 C171 113,171 88,161 61 C151 32,125 13,100 13Z' stroke='rgba(190, 180, 220, 0.08)' stroke-width='0.7' fill='none'/%3E%3Cellipse cx='100' cy='150' rx='10' ry='3' fill='url(%23g-mouth)'/%3E%3Cpath d='M91.5 151.2 Q100 153.2, 108.5 151.2' stroke='rgba(200, 190, 240, 0.12)' stroke-width='0.8' fill='none'/%3E%3Cpath d='M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z' fill='url(%23g-eye)' stroke='rgba(200, 190, 230, 0.10)' stroke-width='1.2'/%3E%3Cpath d='M55 86 C60 92, 80 92, 85 86' fill='none' stroke='rgba(220, 212, 240, 0.06)' stroke-width='1' stroke-linecap='round' /%3E%3Cpath d='M53 82 C53 72, 62 68, 72 68 C81 68, 87 74, 87 82' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3Cpath d='M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z' fill='url(%23g-eye)' stroke='rgba(200, 190, 230, 0.10)' stroke-width='1.2'/%3E%3Cpath d='M115 86 C120 92, 140 92, 145 86' fill='none' stroke='rgba(220, 212, 240, 0.06)' stroke-width='1' stroke-linecap='round' /%3E%3Cpath d='M113 82 C113 74, 119 68, 128 68 C137 68, 147 72, 147 82' fill='none' stroke='%23000000' stroke-width='1.2'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6));
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.45));
+  position: relative;
+  left: -15px;
+  /* <--- Shift only the logo back right to stay centered */
+}
+
+#kc-header-wrapper::after {
+  content: "";
+  display: block;
+  width: 110px;
+  height: 16px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55) 0%, transparent 70%);
+  margin-top: -10px;
+  margin-bottom: 1.5rem;
+  opacity: 0.7;
 }
 
 @media (max-width: 980px) {
