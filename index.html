@@ -9,7 +9,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&family=DM+Mono:wght@300;400&display=swap"
         rel="stylesheet">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='10 10 180 180'%3E%3Cdefs%3E%3CradialGradient id='gf' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0%25' stop-color='%23322a40' /%3E%3Cstop offset='100%25' stop-color='%23050407' /%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23gf)' /%3E%3Cpath d='M52 82 C52 72, 88 72, 88 82 C88 92, 52 92, 52 82Z' fill='%23000' /%3E%3Cpath d='M112 82 C112 72, 148 72, 148 82 C148 92, 112 92, 112 82Z' fill='%23000' /%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='10 10 180 180'%3E%3Cdefs%3E%3CradialGradient id='gf' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0%25' stop-color='%23322a40' /%3E%3Cstop offset='100%25' stop-color='%23050407' /%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23gf)' /%3E%3Cpath d='M52 82 C52 72, 88 72, 88 82 C88 92, 52 92, 52 82Z' fill='%23000' /%3E%3Cpath d='M112 82 C112 72, 148 72, 148 82 C148 92, 112 92, 112 82Z' fill='%23000' /%3E%3C/svg%3E">
     <style>
         :root {
             /* Base — very deep, slightly purple-black like Venice at night */
@@ -167,7 +168,8 @@
             font-weight: 400;
             color: var(--white);
             letter-spacing: 0.12em;
-            line-height: 1.1; /* Increased line-height for better wrapping */
+            line-height: 1.1;
+            /* Increased line-height for better wrapping */
             margin-bottom: 12px;
             z-index: 1;
             opacity: 0;
@@ -702,19 +704,25 @@
         }
 
         @keyframes maskFloat {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: translateY(0px);
             }
+
             50% {
                 transform: translateY(-18px);
             }
         }
 
         @keyframes shadowPulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: translateX(-50%) scaleX(1) scaleY(1);
                 opacity: 0.7;
             }
+
             50% {
                 transform: translateX(-50%) scaleX(1.4) scaleY(0.6);
                 opacity: 0.35;
@@ -723,20 +731,62 @@
 
         /* ── Steam Animation ── */
         @keyframes steamRiseL {
-            0%, 50% { transform: translateY(0) translateX(0) scale(0.3); opacity: 0; }
-            75% { opacity: 0.55; transform: translateY(30px) translateX(-8px) scale(1.3); }
-            100% { transform: translateY(75px) translateX(-22px) scale(2.6); opacity: 0; }
+
+            0%,
+            50% {
+                transform: translateY(0) translateX(0) scale(0.3);
+                opacity: 0;
+            }
+
+            75% {
+                opacity: 0.55;
+                transform: translateY(30px) translateX(-8px) scale(1.3);
+            }
+
+            100% {
+                transform: translateY(75px) translateX(-22px) scale(2.6);
+                opacity: 0;
+            }
         }
+
         @keyframes steamRiseR {
-            0%, 50% { transform: translateY(0) translateX(0) scale(0.3); opacity: 0; }
-            75% { opacity: 0.55; transform: translateY(30px) translateX(8px) scale(1.3); }
-            100% { transform: translateY(75px) translateX(22px) scale(2.6); opacity: 0; }
+
+            0%,
+            50% {
+                transform: translateY(0) translateX(0) scale(0.3);
+                opacity: 0;
+            }
+
+            75% {
+                opacity: 0.55;
+                transform: translateY(30px) translateX(8px) scale(1.3);
+            }
+
+            100% {
+                transform: translateY(75px) translateX(22px) scale(2.6);
+                opacity: 0;
+            }
         }
+
         @keyframes steamRiseC {
-            0%, 50% { transform: translateY(0) translateX(0) scale(0.3); opacity: 0; }
-            75% { opacity: 0.65; transform: translateY(35px) translateX(0) scale(1.5); }
-            100% { transform: translateY(80px) translateX(0) scale(3.2); opacity: 0; }
+
+            0%,
+            50% {
+                transform: translateY(0) translateX(0) scale(0.3);
+                opacity: 0;
+            }
+
+            75% {
+                opacity: 0.65;
+                transform: translateY(35px) translateX(0) scale(1.5);
+            }
+
+            100% {
+                transform: translateY(80px) translateX(0) scale(3.2);
+                opacity: 0;
+            }
         }
+
         .steam-wisp {
             opacity: 0;
             pointer-events: none;
@@ -744,9 +794,21 @@
             transform-origin: center;
             will-change: transform, opacity;
         }
-        .wisp-1 { animation: steamRiseL 7s infinite ease-in-out; animation-delay: 0s; }
-        .wisp-2 { animation: steamRiseC 7s infinite ease-in-out; animation-delay: 1s; }
-        .wisp-3 { animation: steamRiseR 7s infinite ease-in-out; animation-delay: 2s; }
+
+        .wisp-1 {
+            animation: steamRiseL 7s infinite ease-in-out;
+            animation-delay: 0s;
+        }
+
+        .wisp-2 {
+            animation: steamRiseC 7s infinite ease-in-out;
+            animation-delay: 1s;
+        }
+
+        .wisp-3 {
+            animation: steamRiseR 7s infinite ease-in-out;
+            animation-delay: 2s;
+        }
 
         /* ── Reveal ── */
         .reveal {
@@ -829,7 +891,7 @@
                 padding: 40px 24px !important;
             }
 
-            .footer-container > div:last-child {
+            .footer-container>div:last-child {
                 text-align: center !important;
             }
 
@@ -864,7 +926,8 @@
                 width: 100%;
             }
 
-            .btn-primary, .btn-secondary {
+            .btn-primary,
+            .btn-secondary {
                 width: 100%;
                 justify-content: center;
             }
@@ -893,7 +956,8 @@
     <!-- ── HERO ── -->
     <section class="hero">
         <div class="mask-wrap">
-            <svg class="mask-svg" width="180" height="250" viewBox="10 0 180 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="mask-svg" width="180" height="250" viewBox="10 0 180 250" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <!-- Velvet base material (rich deep purplish black) -->
                     <radialGradient id="gf" cx="50%" cy="30%" r="70%">
@@ -902,7 +966,7 @@
                         <stop offset="75%" stop-color="#110e17" />
                         <stop offset="100%" stop-color="#050407" />
                     </radialGradient>
-                    
+
                     <!-- 3D Form shaping highlights (Softer, wider volume for balance) -->
                     <radialGradient id="g-form" cx="50%" cy="40%" r="70%" fx="50%" fy="30%">
                         <stop offset="0%" stop-color="rgba(180, 160, 220, 0.08)" />
@@ -949,19 +1013,27 @@
                 </defs>
 
                 <!-- 1. BASE MASK SHAPE (Golden Mean - 35 to 165) -->
-                <path d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z" fill="url(#gf)" />
-                
+                <path
+                    d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z"
+                    fill="url(#gf)" />
+
                 <!-- 2. VOLUME / 3D SCULPTING -->
-                <path d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z" fill="url(#g-form)" />
+                <path
+                    d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z"
+                    fill="url(#g-form)" />
 
                 <!-- 3. NOSE BRIDGE (Subtle sculpting) -->
                 <ellipse cx="100" cy="95" rx="8" ry="40" fill="url(#g-nose)" />
 
                 <!-- 4. VENETIAN RIM TRIM (Subtle outer definition) -->
-                <path d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z" stroke="url(#g-rim)" stroke-width="2" fill="none" />
-                
+                <path
+                    d="M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z"
+                    stroke="url(#g-rim)" stroke-width="2" fill="none" />
+
                 <!-- Silent inner definition (Perfectly offset copy) -->
-                <path d="M100 13 C75 13,49 32,39 61 C29 88,29 113,39 137 C49 161,71 176,86 181 C94 184,106 184,114 181 C129 176,151 161,161 137 C171 113,171 88,161 61 C151 32,125 13,100 13Z" stroke="rgba(190, 180, 220, 0.08)" stroke-width="0.7" fill="none" />
+                <path
+                    d="M100 13 C75 13,49 32,39 61 C29 88,29 113,39 137 C49 161,71 176,86 181 C94 184,106 184,114 181 C129 176,151 161,161 137 C171 113,171 88,161 61 C151 32,125 13,100 13Z"
+                    stroke="rgba(190, 180, 220, 0.08)" stroke-width="0.7" fill="none" />
 
                 <!-- 5. MOUTH / BREATHING AREA (Realistic 3D Ellipse) -->
                 <!-- Ambient occlusion shadow around the hole -->
@@ -969,20 +1041,28 @@
                 <!-- The actual cavity -->
                 <ellipse cx="100" cy="150" rx="10" ry="3" fill="url(#g-mouth)" />
                 <!-- Material thickness highlight (Lower rim) -->
-                <path d="M91.5 151.2 Q100 153.2, 108.5 151.2" stroke="rgba(200, 190, 240, 0.12)" stroke-width="0.8" fill="none" opacity="0.6" />
+                <path d="M91.5 151.2 Q100 153.2, 108.5 151.2" stroke="rgba(200, 190, 240, 0.12)" stroke-width="0.8"
+                    fill="none" opacity="0.6" />
                 <!-- Internal upper shadow for depth -->
                 <path d="M91 150 Q100 149, 109 150" stroke="rgba(0,0,0,0.5)" stroke-width="1.2" fill="none" />
 
                 <!-- 6. EYES (Mysterious deep cuts) -->
                 <!-- Left Eye -->
-                <path d="M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z" fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
-                <path d="M55 86 C60 92, 80 92, 85 86" fill="none" stroke="rgba(220, 212, 240, 0.06)" stroke-width="1" stroke-linecap="round" />
-                <path d="M53 82 C53 72, 62 68, 72 68 C81 68, 87 74, 87 82" fill="none" stroke="#000000" stroke-width="1.2" />
+                <path d="M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z"
+                    fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
+                <path d="M55 86 C60 92, 80 92, 85 86" fill="none" stroke="rgba(220, 212, 240, 0.06)" stroke-width="1"
+                    stroke-linecap="round" />
+                <path d="M53 82 C53 72, 62 68, 72 68 C81 68, 87 74, 87 82" fill="none" stroke="#000000"
+                    stroke-width="1.2" />
 
                 <!-- Right Eye -->
-                <path d="M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z" fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
-                <path d="M115 86 C120 92, 140 92, 145 86" fill="none" stroke="rgba(220, 212, 240, 0.06)" stroke-width="1" stroke-linecap="round" />
-                <path d="M113 82 C113 74, 119 68, 128 68 C137 68, 147 72, 147 82" fill="none" stroke="#000000" stroke-width="1.2" />
+                <path
+                    d="M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z"
+                    fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
+                <path d="M115 86 C120 92, 140 92, 145 86" fill="none" stroke="rgba(220, 212, 240, 0.06)"
+                    stroke-width="1" stroke-linecap="round" />
+                <path d="M113 82 C113 74, 119 68, 128 68 C137 68, 147 72, 147 82" fill="none" stroke="#000000"
+                    stroke-width="1.2" />
 
                 <!-- Steam/Breath (Realistic spreading trapezoid effect) -->
                 <circle class="steam-wisp wisp-1" cx="100" cy="152" r="16" fill="url(#g-steam)" />
@@ -1039,19 +1119,22 @@
             <div class="flow-step key">
                 <span class="flow-step-num">02</span>
                 <div class="flow-step-title">Mask</div>
-                <div class="flow-step-desc">Microsoft Presidio & local Ollama (Phi-4) detect sensitive data, replacing it with UUID tokens.</div>
+                <div class="flow-step-desc">Microsoft Presidio & local Ollama (Phi-4) detect sensitive data, replacing
+                    it with UUID tokens.</div>
             </div>
             <div class="flow-arrow">→</div>
             <div class="flow-step">
                 <span class="flow-step-num">03</span>
                 <div class="flow-step-title">AI Task</div>
-                <div class="flow-step-desc">Masked text sent to external AI (Claude 4.6 / GPT-5 / Gemini 3 / OpenRouter) or local models</div>
+                <div class="flow-step-desc">Masked text sent to external AI (Claude 4.6 / GPT-5 / Gemini 3 / OpenRouter)
+                    or local models</div>
             </div>
             <div class="flow-arrow">→</div>
             <div class="flow-step key">
                 <span class="flow-step-num">04</span>
                 <div class="flow-step-title">Restore</div>
-                <div class="flow-step-desc">Real data re-injected from encrypted vault. Securely served via OIDC/Keycloak SSO.</div>
+                <div class="flow-step-desc">Real data re-injected from encrypted vault. Securely served via
+                    OIDC/Keycloak SSO.</div>
             </div>
         </div>
 
@@ -1085,14 +1168,16 @@
 
         <div class="problem-grid reveal">
             <div class="problem-card">
-                <div class="problem-label"><span class="dot dot-bad"></span> Without <span style="color:var(--white)">Moretta</span></div>
+                <div class="problem-label"><span class="dot dot-bad"></span> Without <span
+                        style="color:var(--white)">Moretta</span></div>
                 <div class="problem-title">Data leaves. Silently.</div>
                 <div class="problem-body">Employee pastes a contract into ChatGPT. 34.8% of what reaches OpenAI servers
                     is sensitive — PII, salaries, client names. IT has no log. GDPR clock starts. You won't know for 241
                     days on average.</div>
             </div>
             <div class="problem-card">
-                <div class="problem-label"><span class="dot dot-good"></span> With <span style="color:var(--white)">Moretta</span></div>
+                <div class="problem-label"><span class="dot dot-good"></span> With <span
+                        style="color:var(--white)">Moretta</span></div>
                 <div class="problem-title">AI works. Data stays.</div>
                 <div class="problem-body">Same contract. Moretta masks it locally, sends <span
                         style="font-family:'DM Mono',monospace;font-size:13px;color:var(--silver-dim)">[PERSON_a3f2]</span>
@@ -1150,136 +1235,136 @@
                 style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-dim);margin-bottom:16px">
                 Local anonymisation model &mdash; runs on your server, data never leaves</p>
             <div class="model-table-container">
-            <table class="model-table">
-                <thead>
-                    <tr>
-                        <th>Model</th>
-                        <th>RAM</th>
-                        <th>GPU</th>
-                        <th>PII quality</th>
-                        <th>Context</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>phi4-mini</td>
-                        <td>4 GB</td>
-                        <td>CPU only</td>
-                        <td><span class="badge-sm badge-ok">Good</span></td>
-                        <td>128k</td>
-                        <td>Microsoft 3.8B (Jan 2026). Ideal for 8GB RAM systems.</td>
-                    </tr>
-                    <tr>
-                        <td>mistral:7b-small-3</td>
-                        <td>8 GB</td>
-                        <td>Optional</td>
-                        <td><span class="badge-sm badge-good">Better</span></td>
-                        <td>32k</td>
-                        <td>Latest Mistral Small. Optimized for speed/throughput.</td>
-                    </tr>
-                    <tr>
-                        <td>qwen3:7b</td>
-                        <td>8 GB</td>
-                        <td>Required</td>
-                        <td><span class="badge-sm badge-best">Best</span></td>
-                        <td>262k</td>
-                        <td>Alibaba Qwen3 (Feb 2026). Native multimodal & 200+ languages.</td>
-                    </tr>
-                    <tr>
-                        <td>llama3.3:8b</td>
-                        <td>8 GB</td>
-                        <td>Optional</td>
-                        <td><span class="badge-sm badge-best">Best</span></td>
-                        <td>128k</td>
-                        <td>Meta Llama 3.3. Strong all-rounder for Nerv/extraction.</td>
-                    </tr>
-                    <tr>
-                        <td>deepseek-v3.2:speciale</td>
-                        <td>12 GB</td>
-                        <td>Required</td>
-                        <td><span class="badge-sm badge-best">Elite</span></td>
-                        <td>128k</td>
-                        <td>State-of-the-art reasoning on par with GPT-5.1.</td>
-                    </tr>
-                    <tr>
-                        <td>gpt-oss-120b</td>
-                        <td>80 GB+</td>
-                        <td>Multi-GPU</td>
-                        <td><span class="badge-sm badge-best">Elite</span></td>
-                        <td>128k</td>
-                        <td>OpenAI's top open-weight MoE model. Near frontier reasoning.</td>
-                    </tr>
-                </tbody>
-            </table>
+                <table class="model-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>RAM</th>
+                            <th>GPU</th>
+                            <th>PII quality</th>
+                            <th>Context</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>phi4-mini</td>
+                            <td>4 GB</td>
+                            <td>CPU only</td>
+                            <td><span class="badge-sm badge-ok">Good</span></td>
+                            <td>128k</td>
+                            <td>Microsoft 3.8B (Jan 2026). Ideal for 8GB RAM systems.</td>
+                        </tr>
+                        <tr>
+                            <td>mistral:7b-small-3</td>
+                            <td>8 GB</td>
+                            <td>Optional</td>
+                            <td><span class="badge-sm badge-good">Better</span></td>
+                            <td>32k</td>
+                            <td>Latest Mistral Small. Optimized for speed/throughput.</td>
+                        </tr>
+                        <tr>
+                            <td>qwen3:7b</td>
+                            <td>8 GB</td>
+                            <td>Required</td>
+                            <td><span class="badge-sm badge-best">Best</span></td>
+                            <td>262k</td>
+                            <td>Alibaba Qwen3 (Feb 2026). Native multimodal & 200+ languages.</td>
+                        </tr>
+                        <tr>
+                            <td>llama3.3:8b</td>
+                            <td>8 GB</td>
+                            <td>Optional</td>
+                            <td><span class="badge-sm badge-best">Best</span></td>
+                            <td>128k</td>
+                            <td>Meta Llama 3.3. Strong all-rounder for Nerv/extraction.</td>
+                        </tr>
+                        <tr>
+                            <td>deepseek-v3.2:speciale</td>
+                            <td>12 GB</td>
+                            <td>Required</td>
+                            <td><span class="badge-sm badge-best">Elite</span></td>
+                            <td>128k</td>
+                            <td>State-of-the-art reasoning on par with GPT-5.1.</td>
+                        </tr>
+                        <tr>
+                            <td>gpt-oss-120b</td>
+                            <td>80 GB+</td>
+                            <td>Multi-GPU</td>
+                            <td><span class="badge-sm badge-best">Elite</span></td>
+                            <td>128k</td>
+                            <td>OpenAI's top open-weight MoE model. Near frontier reasoning.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             <p
                 style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-dim);margin-bottom:16px">
                 External AI providers &mdash; receive only masked tokens, never real data</p>
             <div class="model-table-container">
-            <table class="model-table">
-                <thead>
-                    <tr>
-                        <th>Provider</th>
-                        <th>Model</th>
-                        <th>Input /1M tok</th>
-                        <th>Output /1M tok</th>
-                        <th>Context</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Anthropic</td>
-                        <td>claude-sonnet-4-6</td>
-                        <td>$3.00</td>
-                        <td>$15.00</td>
-                        <td>1M tokens</td>
-                    </tr>
-                    <tr>
-                        <td>Anthropic</td>
-                        <td>claude-opus-4-6</td>
-                        <td>$15.00</td>
-                        <td>$75.00</td>
-                        <td>1M tokens</td>
-                    </tr>
-                    <tr>
-                        <td>OpenAI</td>
-                        <td>gpt-5.4</td>
-                        <td>$2.50</td>
-                        <td>$10.00</td>
-                        <td>272k tokens</td>
-                    </tr>
-                    <tr>
-                        <td>Google</td>
-                        <td>gemini-3.1-pro</td>
-                        <td>$1.25</td>
-                        <td>$10.00</td>
-                        <td>1M+ tokens</td>
-                    </tr>
-                    <tr>
-                        <td>OpenAI</td>
-                        <td>gpt-5.4-pro</td>
-                        <td>$30.00</td>
-                        <td>$180.00</td>
-                        <td>272k tokens</td>
-                    </tr>
-                    <tr>
-                        <td>OpenAI</td>
-                        <td>gpt-5-mini</td>
-                        <td>$0.15</td>
-                        <td>$0.60</td>
-                        <td>128k tokens</td>
-                    </tr>
-                    <tr>
-                        <td>Xiaomi</td>
-                        <td>mimo-v2-flash</td>
-                        <td>$0.40</td>
-                        <td>$1.60</td>
-                        <td>256k tokens</td>
-                    </tr>
-                </tbody>
-            </table>
+                <table class="model-table">
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>Model</th>
+                            <th>Input /1M tok</th>
+                            <th>Output /1M tok</th>
+                            <th>Context</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Anthropic</td>
+                            <td>claude-sonnet-4-6</td>
+                            <td>$3.00</td>
+                            <td>$15.00</td>
+                            <td>1M tokens</td>
+                        </tr>
+                        <tr>
+                            <td>Anthropic</td>
+                            <td>claude-opus-4-6</td>
+                            <td>$15.00</td>
+                            <td>$75.00</td>
+                            <td>1M tokens</td>
+                        </tr>
+                        <tr>
+                            <td>OpenAI</td>
+                            <td>gpt-5.4</td>
+                            <td>$2.50</td>
+                            <td>$10.00</td>
+                            <td>272k tokens</td>
+                        </tr>
+                        <tr>
+                            <td>Google</td>
+                            <td>gemini-3.1-pro</td>
+                            <td>$1.25</td>
+                            <td>$10.00</td>
+                            <td>1M+ tokens</td>
+                        </tr>
+                        <tr>
+                            <td>OpenAI</td>
+                            <td>gpt-5.4-pro</td>
+                            <td>$30.00</td>
+                            <td>$180.00</td>
+                            <td>272k tokens</td>
+                        </tr>
+                        <tr>
+                            <td>OpenAI</td>
+                            <td>gpt-5-mini</td>
+                            <td>$0.15</td>
+                            <td>$0.60</td>
+                            <td>128k tokens</td>
+                        </tr>
+                        <tr>
+                            <td>Xiaomi</td>
+                            <td>mimo-v2-flash</td>
+                            <td>$0.40</td>
+                            <td>$1.60</td>
+                            <td>256k tokens</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
             <p
                 style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white3);margin-top:10px;letter-spacing:0.05em">
