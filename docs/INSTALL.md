@@ -37,11 +37,16 @@ chmod +x start.sh
 - **Frontend:** [http://localhost:3000](http://localhost:3000)
 - **Keycloak Admin:** [http://localhost:8080/auth](http://localhost:8080/auth)
 
-### Initial Credentials (SSO)
-Moretta comes with a pre-configured test realm.
-- **Username:** `moretta.admin`
-- **Password:** `ChangeMe123!`
-*Note: You will be forced to change this password on the first login.*
+### Initial User Setup
+
+For enhanced security, the repository does **not** include pre-provisioned users. To access Moretta for the first time:
+
+1.  Go to the **[Keycloak Admin Console](http://localhost:8080/auth)**.
+2.  Login with **Master Admin** credentials from your `.env` (default: `admin` / `admin123`).
+3.  Switch the realm from `master` to **`moretta`** (dropdown menu in the top left).
+4.  Navigate to **Users** -> **Add user** and create your primary account.
+5.  Set your password in the **Credentials** tab (set "Temporary" to **on**, so you can change your password later).
+6.  You can now login to the main dashboard at [http://localhost:3000](http://localhost:3000).
 
 ## Detailed Configuration Reference
 

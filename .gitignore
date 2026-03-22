@@ -71,10 +71,10 @@ Thumbs.db
 # Pliki związane z modelem/AI tymczasowe
 __MACOSX/
 
-# Dane dynamiczne, logi, uploady i bazy danych
+
 data/
 uploads/
 **/uploads/
 *.db
 logs/
-*.log
+*.log

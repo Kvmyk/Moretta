@@ -25,22 +25,5 @@
       }
     }
   ],
-  "users": [
-    {
-      "username": "JakubAdmin",
-      "enabled": true,
-      "email": "admin@moretta.local",
-      "emailVerified": true,
-      "firstName": "Moretta",
-      "lastName": "Admin",
-      "requiredActions": ["UPDATE_PASSWORD"],
-      "credentials": [
-        {
-          "type": "password",
-          "value": "changePass",
-          "temporary": true
-        }
-      ]
-    }
-  ]
+  "users": []
 }

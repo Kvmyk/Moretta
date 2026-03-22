@@ -949,6 +949,7 @@
             <li><a href="#how">How it works</a></li>
             <li><a href="#problem">The problem</a></li>
             <li><a href="#install">Install</a></li>
+            <li><a href="docs/index.html">Docs</a></li>
             <li><a href="https://github.com/Kvmyk/moretta" target="_blank">GitHub ↗</a></li>
         </ul>
     </nav>
@@ -1373,6 +1374,88 @@
         </div>
     </section>
 
+    <div class="divider"></div>
+
+    <!-- ── DOCS ── -->
+    <section class="section" id="docs">
+        <p class="section-label reveal">Documentation</p>
+        <h2 class="section-title reveal">Deploy Moretta.<br>Complete Guide.</h2>
+        <p class="section-body reveal">Everything you need to configure and secure your own private AI gateway.</p>
+
+        <div class="problem-grid reveal">
+            <div class="problem-card">
+                <div class="problem-label">Step 1: Prerequisites</div>
+                <div class="problem-title">Infrastructure</div>
+                <div class="problem-body">
+                    - **Docker** and **Docker Compose** installed.<br>
+                    - Minimum **8 GB RAM** (16 GB for large models).<br>
+                    - Root permissions for network binding.
+                </div>
+            </div>
+            <div class="problem-card">
+                <div class="problem-label">Step 2: SSO Credentials</div>
+                <div class="problem-title">OIDC Auth</div>
+                <div class="problem-body">
+                    Moretta includes a test realm. Use these for first login:<br>
+                    - **User:** `moretta.admin`<br>
+                    - **Pass:** `ChangeMe123!` (Force change on login).
+                </div>
+            </div>
+        </div>
+
+        <div class="terminal reveal" style="margin-top:40px">
+            <span class="comment"># 1. Clone & Environment</span><br>
+            <span class="cmd">git clone</span> https://github.com/Kvmyk/moretta.git<br>
+            <span class="cmd">cd</span> moretta<br>
+            <span class="cmd">cp</span> .env.example .env<br><br>
+            <span class="comment"># 2. Configure .env (Set VAULT_ENCRYPTION_KEY and AI keys)</span><br>
+            <span class="cmd">nano</span> .env<br><br>
+            <span class="comment"># 3. Launch on Linux/macOS</span><br>
+            <span class="cmd">./start.sh</span><br><br>
+            <span class="comment"># 3. Launch on Windows</span><br>
+            <span class="cmd">start.bat</span>
+        </div>
+
+        <div class="reveal">
+            <p
+                style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:16px;letter-spacing:0.1em">
+                Configuration Variables (.env Reference)</p>
+            <div class="model-table-container">
+                <table class="model-table">
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>LOCAL_MODEL</td>
+                            <td>phi4-mini</td>
+                            <td>PII detection model (Ollama)</td>
+                        </tr>
+                        <tr>
+                            <td>VAULT_ENCRYPTION_KEY</td>
+                            <td>(Required)</td>
+                            <td>32-64 hex char key for SQLite encryption</td>
+                        </tr>
+                        <tr>
+                            <td>DEFAULT_PROVIDER</td>
+                            <td>claude</td>
+                            <td>AI engine (claude/openai/gemini/ollama)</td>
+                        </tr>
+                        <tr>
+                            <td>SSO_ENABLED</td>
+                            <td>true</td>
+                            <td>Enable OIDC token validation</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
     <!-- ── CTA ── -->
     <div class="cta-band reveal">
         <p class="section-label no-line" style="justify-content:center;max-width:180px;margin:0 auto 18px">Get started
@@ -1400,22 +1483,6 @@
     </div>
 
     <!-- ── FOOTER ── -->
-    <div class="footer-container"
-        style="border-top:1px solid var(--border);padding:48px 56px;display:flex;align-items:center;justify-content:space-between;background:var(--bg2)">
-        <div>
-            <p
-                style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.25em;text-transform:uppercase;color:var(--white3);margin-bottom:10px">
-                Author</p>
-            <p
-                style="font-family:'Cinzel',serif;font-size:18px;color:var(--white);letter-spacing:0.08em;margin-bottom:10px">
-                Jakub Kamionka</p>
-            <div style="display:flex;gap:20px">
-                <a href="https://github.com/Kvmyk" target="_blank"
-                    style="font-family:'DM Mono',monospace;font-size:11px;color:var(--white3);text-decoration:none;letter-spacing:0.1em;display:flex;align-items:center;gap:6px;transition:color 0.2s"
-                    onmouseover="this.style.color='var(--silver)'" onmouseout="this.style.color='var(--white3)'">
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                        <path
-                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                     </svg>
                     github.com/Kvmyk
                 </a>

@@ -41,11 +41,12 @@ Navigate to http://localhost:3000 to use the application.
 Configure API keys and vault encryption key in the .env file.
 Keycloak endpoints are proxied via frontend at: http://localhost:3000/auth.
 
-### Default App Login (SSO)
-The repository provisions a default test realm. Use the following initial credentials:
-- **Username:** `moretta.admin`
-- **Password:** `ChangeMe123!`
-*(Keycloak will force you to change this password on your first login for security).*
+### Initial User Setup
+For security, the realm starts with an empty user list.
+- Login to **[Keycloak Admin](http://localhost:8080/auth)** (`admin`/`admin123`).
+- Switch to the **`moretta`** realm (top-left dropdown).
+- Create a user in the **Users** section and set a password in **Credentials**.
+- Login at [http://localhost:3000](http://localhost:3000).
 
 ## AI Providers
 
