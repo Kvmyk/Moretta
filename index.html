@@ -866,23 +866,23 @@
                         <stop offset="100%" stop-color="#050407" />
                     </radialGradient>
                     
-                    <!-- 3D Form shaping highlights (Cheeks & Brow) -->
-                    <radialGradient id="g-form" cx="50%" cy="45%" r="65%">
+                    <!-- 3D Form shaping highlights (Form Volume - no filters for iOS) -->
+                    <radialGradient id="g-form" cx="50%" cy="40%" r="60%">
                         <stop offset="0%" stop-color="rgba(180, 160, 220, 0.08)" />
-                        <stop offset="35%" stop-color="rgba(180, 160, 220, 0.02)" />
-                        <stop offset="80%" stop-color="rgba(180, 160, 220, 0)" />
+                        <stop offset="45%" stop-color="rgba(180, 160, 220, 0.02)" />
+                        <stop offset="100%" stop-color="rgba(180, 160, 220, 0)" />
                     </radialGradient>
 
                     <!-- Velvet rim light (Fresnel effect) along the edge -->
                     <linearGradient id="g-rim" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(200, 190, 240, 0.25)" />
-                        <stop offset="15%" stop-color="rgba(200, 190, 240, 0.05)" />
+                        <stop offset="0%" stop-color="rgba(200, 190, 240, 0.22)" />
+                        <stop offset="15%" stop-color="rgba(200, 190, 240, 0.04)" />
                         <stop offset="50%" stop-color="rgba(200, 190, 240, 0)" />
-                        <stop offset="85%" stop-color="rgba(200, 190, 240, 0.05)" />
-                        <stop offset="100%" stop-color="rgba(200, 190, 240, 0.25)" />
+                        <stop offset="85%" stop-color="rgba(200, 190, 240, 0.04)" />
+                        <stop offset="100%" stop-color="rgba(200, 190, 240, 0.22)" />
                     </linearGradient>
 
-                    <!-- Eye socket depth (subtle internal volume) -->
+                    <!-- Eye socket depth (internal volume) -->
                     <linearGradient id="g-eye" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stop-color="#020103" />
                         <stop offset="100%" stop-color="#161221" />
@@ -890,46 +890,32 @@
                 </defs>
 
                 <!-- 1. BASE MASK SHAPE -->
-                <path id="mask-base" d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" fill="url(#gf)" />
+                <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" fill="url(#gf)" />
                 
-                <!-- 2. VOLUME / 3D SCULPTING (Cheekbones & Forehead) -->
-                <!-- Forehead curve highlight -->
-                <path d="M40 45 Q100 15 160 45 Q100 70 40 45Z" fill="rgba(200, 190, 230, 0.04)" filter="blur(6px)" />
-                <!-- Left cheekbone contour highlight -->
-                <path d="M30 95 Q60 110 50 140 Q25 120 30 95Z" fill="rgba(200, 190, 230, 0.03)" filter="blur(8px)" />
-                <!-- Right cheekbone contour highlight -->
-                <path d="M170 95 Q140 110 150 140 Q175 120 170 95Z" fill="rgba(200, 190, 230, 0.03)" filter="blur(8px)" />
-                
-                <!-- Soft form overlay to blend it all -->
+                <!-- 2. VOLUME / 3D SCULPTING (Blended Overlay) -->
                 <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" fill="url(#g-form)" />
 
-                <!-- 3. VENETIAN TRIM (Elegant edge styling) -->
-                <!-- Ambient Rim Light -->
-                <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" stroke="url(#g-rim)" stroke-width="2.5" fill="none" />
+                <!-- 3. VENETIAN RIM TRIM (Subtle outer definition) -->
+                <!-- Rim Light -->
+                <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" stroke="url(#g-rim)" stroke-width="2" fill="none" />
                 
-                <!-- Inner silver piping / stitching -->
-                <path d="M100 14 C75 14,47 32,35 61 C26 85,28 113,38 135 C47 153,62 166,78 173 C89 178,95 180,100 180 C105 180,111 178,122 173 C138 166,153 153,162 135 C172 113,174 85,165 61 C153 32,125 14,100 14Z" stroke="rgba(190, 180, 220, 0.15)" stroke-width="0.8" fill="none" stroke-dasharray="3 2" />
+                <!-- Simple solid inner line for structure (no dashed lines for Safari compatibility) -->
+                <path d="M100 13 C74 13,44 32,33 61 C23 86,25 114,36 136 C46 156,61 168,78 175 C91 179,104 179,117 175 C134 168,151 156,161 136 C171 114,173 86,163 61 C152 32,124 13,100 13Z" stroke="rgba(190, 180, 220, 0.08)" stroke-width="0.7" fill="none" />
 
-                <!-- 4. EYES (Simple, mysterious deep cuts) -->
+                <!-- 4. EYES (Mysterious deep cuts) -->
                 <!-- Left Eye -->
-                <!-- Smooth velvet edge catchlight -->
-                <path d="M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z" fill="none" stroke="rgba(200, 190, 230, 0.15)" stroke-width="1.2" />
-                <!-- The void (with depth gradient) -->
-                <path d="M53 82 C53 73, 62 69, 72 69 C81 69, 87 75, 87 82 C87 89, 80 93, 70 93 C61 93, 53 89, 53 82Z" fill="url(#g-eye)" />
-                <!-- Inner depth rim (bottom light catch) -->
-                <path d="M55 86 C60 92, 80 92, 85 86" fill="none" stroke="rgba(220, 212, 240, 0.08)" stroke-width="1" stroke-linecap="round" />
-                <!-- Subtle inner shadow/depth top -->
-                <path d="M53 82 C53 73, 62 69, 72 69 C81 69, 87 75, 87 82" fill="none" stroke="#000000" stroke-width="2" />
+                <path d="M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z" fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
+                <!-- Bottom inner rim highlight -->
+                <path d="M55 86 C60 92, 80 92, 85 86" fill="none" stroke="rgba(220, 212, 240, 0.06)" stroke-width="1" stroke-linecap="round" />
+                <!-- Top inner shadow line -->
+                <path d="M53 82 C53 72, 62 68, 72 68 C81 68, 87 74, 87 82" fill="none" stroke="#000000" stroke-width="1.2" />
 
                 <!-- Right Eye -->
-                <!-- Smooth velvet edge catchlight -->
-                <path d="M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z" fill="none" stroke="rgba(200, 190, 240, 0.15)" stroke-width="1.2" />
-                <!-- The void (with depth gradient) -->
-                <path d="M113 82 C113 75, 119 69, 128 69 C137 69, 147 73, 147 82 C147 89, 139 93, 130 93 C121 93, 113 89, 113 82Z" fill="url(#g-eye)" />
-                <!-- Inner depth rim (bottom light catch) -->
-                <path d="M115 86 C120 92, 140 92, 145 86" fill="none" stroke="rgba(220, 212, 240, 0.08)" stroke-width="1" stroke-linecap="round" />
-                <!-- Subtle inner shadow/depth top -->
-                <path d="M113 82 C113 75, 119 69, 128 69 C137 69, 147 73, 147 82" fill="none" stroke="#000000" stroke-width="2" />
+                <path d="M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z" fill="url(#g-eye)" stroke="rgba(200, 190, 230, 0.10)" stroke-width="1.2" />
+                <!-- Bottom inner rim highlight -->
+                <path d="M115 86 C120 92, 140 92, 145 86" fill="none" stroke="rgba(220, 212, 240, 0.06)" stroke-width="1" stroke-linecap="round" />
+                <!-- Top inner shadow line -->
+                <path d="M113 82 C113 74, 119 68, 128 68 C137 68, 147 72, 147 82" fill="none" stroke="#000000" stroke-width="1.2" />
             </svg>
             <div class="mask-shadow"></div>
         </div>
