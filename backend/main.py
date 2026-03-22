@@ -1,5 +1,5 @@
 """
-PrivateProxy — Main FastAPI application.
+Moretta — Main FastAPI application.
 Provides all API endpoints for file upload, PII detection, anonymization,
 AI processing, and result retrieval.
 """
@@ -7,7 +7,9 @@ AI processing, and result retrieval.
 from __future__ import annotations
 
 import asyncio
+import re as _re
 import tempfile
+import time
 import logging
 import os
 import uuid
@@ -35,17 +37,23 @@ from rebuilders import rebuild_xlsx, rebuild_docx
 from providers.base import get_provider
 from audit.audit_log import AuditLogger
 from auth import AuthConfig, AuthError, OIDCValidator
+from store import PersistentStore
 
 # ── Setup ──────────────────────────────────────────────────────────
 
 settings = get_settings()
-logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
-logger = logging.getLogger("privateproxy")
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("moretta")
+access_logger = logging.getLogger("moretta.access")
 
 app = FastAPI(
-    title="PrivateProxy",
+    title="Moretta",
     description="Self-hosted AI proxy with PII anonymization",
-    version="0.1.0",
+    version="0.7.0",
 )
 
 app.add_middleware(
@@ -56,11 +64,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── State stores ───────────────────────────────────────────────────
+# ── State stores (persistent — survive restarts) ───────────────────
 
-# In-memory stores (per-process; fine for single-instance deployment)
-file_store: dict[str, dict[str, Any]] = {}   # file_id → {path, filename, text, pii, ...}
-task_store: dict[str, dict[str, Any]] = {}   # task_id → {status, result_path, ...}
+file_store = PersistentStore(
+    settings.store_db_path,
+    "files",
+    blob_dir=settings.blobs_dir,
+    encryption_key=settings.vault_encryption_key
+)
+task_store = PersistentStore(settings.store_db_path, "tasks")
 
 vault = Vault(settings.vault_path, settings.vault_encryption_key)
 audit = AuditLogger(settings.audit_log_path)
@@ -68,6 +80,21 @@ detector = PiiDetector(settings.ollama_url, settings.local_model)
 guard = SecurityGuard(settings.ollama_url, settings.local_model)
 replacer = PiiReplacer()
 reinjektor = Reinjektor()
+
+# ── TTL cleanup ───────────────────────────────────────────────────
+
+SESSION_TTL_SECONDS = 3600  # 1 hour
+
+async def _cleanup_expired_sessions():
+    """Periodically remove sessions older than SESSION_TTL_SECONDS."""
+    while True:
+        await asyncio.sleep(600)  # Check every 10 minutes
+        expired_files = file_store.cleanup_older_than(SESSION_TTL_SECONDS, "uploaded_at")
+        expired_tasks = task_store.cleanup_older_than(SESSION_TTL_SECONDS, "created_at")
+        for tid in expired_tasks:
+            vault.delete_session(tid)
+        if expired_files or expired_tasks:
+            logger.info(f"TTL cleanup: removed {len(expired_files)} files, {len(expired_tasks)} tasks from memory")
 
 auth_validator = OIDCValidator(
     AuthConfig(
@@ -97,6 +124,51 @@ def _parse_file(path: Path, ext: str) -> dict[str, Any]:
     raise ValueError(f"Unsupported file extension: {ext}")
 
 
+def _get_user(request: Request) -> str:
+    """Extract username from JWT token on the request, or return 'anonymous'."""
+    try:
+        payload = getattr(request.state, "user", None)
+        if payload and isinstance(payload, dict):
+            return payload.get("preferred_username") or payload.get("sub", "unknown")
+    except Exception:
+        pass
+    return "anonymous"
+
+
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP, respecting X-Forwarded-For from reverse proxy."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _sanitize_filename(filename: str) -> str:
+    """
+    Strip potentially sensitive data from filenames before logging.
+    Keeps only the extension so audit trail knows the file type,
+    but doesn't leak names like 'Jan_Kowalski_umowa.docx'.
+    """
+    ext = Path(filename).suffix.lower()
+    return f"***{ext}" if ext else "***"
+
+
+def _sanitize_error(error: str, max_length: int = 200) -> str:
+    """
+    Sanitize error messages before logging to prevent PII leakage.
+    Strips common PII patterns and truncates to max_length.
+    """
+    sanitized = error[:max_length]
+    # Strip common PII patterns that might appear in exception messages
+    sanitized = _re.sub(r'\b\d{11}\b', '[PESEL]', sanitized)           # PESEL
+    sanitized = _re.sub(r'\b\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b', '[PHONE]', sanitized)  # phone
+    sanitized = _re.sub(r'[\w.+-]+@[\w-]+\.[\w.]+', '[EMAIL]', sanitized)  # email
+    sanitized = _re.sub(r'\b[A-Z]{2}\d{2}[\s]?\d{4}[\s]?\d{4}[\s]?\d{4}[\s]?\d{4}[\s]?\d{4}[\s]?\d{4}\b', '[IBAN]', sanitized)  # IBAN
+    if len(error) > max_length:
+        sanitized += "...[truncated]"
+    return sanitized
+
+
 # ── Startup / Shutdown ─────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -104,8 +176,31 @@ async def startup_event() -> None:
     """Ensure required directories exist."""
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+    file_store.initialize()
+    task_store.initialize()
     vault.initialize()
-    logger.info("PrivateProxy backend started")
+    asyncio.create_task(_cleanup_expired_sessions())
+    logger.info(f"Moretta backend v0.7 started ({len(file_store)} files, {len(task_store)} tasks restored)")
+
+
+@app.middleware("http")
+async def access_log_middleware(request: Request, call_next):
+    """Log every HTTP request with user, IP, method, path, status, and duration."""
+    start_time = time.time()
+    response = await call_next(request)
+    duration_ms = round((time.time() - start_time) * 1000)
+
+    if request.url.path.startswith("/api/"):
+        user = _get_user(request)
+        client_ip = _get_client_ip(request)
+        access_logger.info(
+            f"{request.method} {request.url.path} "
+            f"→ {response.status_code} "
+            f"({duration_ms}ms) "
+            f"user={user} ip={client_ip}"
+        )
+
+    return response
 
 
 @app.middleware("http")
@@ -117,14 +212,25 @@ async def require_sso_token(request: Request, call_next):
     if settings.sso_enabled and request.url.path.startswith("/api/"):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            print(f"Auth failed: Missing bearer token for {request.url.path}")
+            audit.log(
+                event="auth_failed",
+                reason="missing_bearer_token",
+                path=request.url.path,
+                ip=_get_client_ip(request),
+            )
             return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
 
         token = auth_header.removeprefix("Bearer ").strip()
         try:
             request.state.user = auth_validator.validate(token)
         except AuthError as exc:
-            print(f"AuthError validating token: {exc}")
+            logger.warning(f"Auth failed for {request.url.path}: {exc}")
+            audit.log(
+                event="auth_failed",
+                reason=str(exc),
+                path=request.url.path,
+                ip=_get_client_ip(request),
+            )
             return JSONResponse(status_code=401, content={"detail": str(exc)})
 
     return await call_next(request)
@@ -141,12 +247,13 @@ async def _run_deep_scan(file_id: str, text: str, existing_pii: list[dict[str, A
             if new_pii:
                 file_store[file_id]["pii"].extend(new_pii)
                 logger.info(f"Deep scan finished for {file_id}, added {len(new_pii)} new PII elements.")
+            file_store.persist(file_id)
     except Exception as exc:
         logger.error(f"Deep scan background task failed: {exc}")
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()) -> dict:
+async def upload_file(request: Request, file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()) -> dict:
     """Upload a file for processing. Returns file_id."""
     filename = file.filename or "unknown"
     ext = Path(filename).suffix.lower()
@@ -190,10 +297,13 @@ async def upload_file(file: UploadFile = File(...), background_tasks: Background
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    user = _get_user(request)
     audit.log(
         event="file_uploaded",
+        user=user,
         session_id=file_id,
-        filename=filename,
+        filename=_sanitize_filename(filename),
+        size_bytes=len(contents),
         pii_count=len(pii_results),
         pii_types=list({p["type"] for p in pii_results}),
     )
@@ -214,7 +324,7 @@ class TextInputRequest(BaseModel):
 
 
 @app.post("/api/text")
-async def process_text(request: TextInputRequest, background_tasks: BackgroundTasks) -> dict:
+async def process_text(http_request: Request, request: TextInputRequest, background_tasks: BackgroundTasks) -> dict:
     """Accept raw text for processing and PII detection."""
     text = request.text
     if not text.strip():
@@ -244,10 +354,13 @@ async def process_text(request: TextInputRequest, background_tasks: BackgroundTa
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    user = _get_user(http_request)
     audit.log(
         event="text_submitted",
+        user=user,
         session_id=file_id,
-        filename=filename,
+        filename=_sanitize_filename(filename),
+        size_bytes=len(file_bytes),
         pii_count=len(pii_results),
         pii_types=list({p["type"] for p in pii_results}),
     )
@@ -264,11 +377,18 @@ async def process_text(request: TextInputRequest, background_tasks: BackgroundTa
 
 
 @app.get("/api/file/{file_id}/pii")
-async def get_pii(file_id: str) -> dict:
+async def get_pii(request: Request, file_id: str) -> dict:
     """Return list of detected PII with types and counts."""
     info = file_store.get(file_id)
     if not info:
         raise HTTPException(status_code=404, detail="File not found")
+
+    audit.log(
+        event="pii_viewed",
+        user=_get_user(request),
+        session_id=file_id,
+        filename=_sanitize_filename(info["filename"]),
+    )
 
     pii_list = info["pii"]
 
@@ -306,11 +426,18 @@ async def get_pii(file_id: str) -> dict:
 
 
 @app.get("/api/file/{file_id}/preview")
-async def get_preview(file_id: str) -> dict:
+async def get_preview(request: Request, file_id: str) -> dict:
     """Return anonymized preview of the file text/structure."""
     info = file_store.get(file_id)
     if not info:
         raise HTTPException(status_code=404, detail="File not found")
+
+    audit.log(
+        event="preview_viewed",
+        user=_get_user(request),
+        session_id=file_id,
+        filename=_sanitize_filename(info["filename"]),
+    )
 
     # Generate token map from full text first to ensure consistency
     anonymized_text, token_map = replacer.anonymize(info["text"], info["pii"])
@@ -354,6 +481,7 @@ async def get_preview(file_id: str) -> dict:
 
 @app.post("/api/task")
 async def create_task(
+    request: Request,
     body: dict,
     background_tasks: BackgroundTasks,
 ) -> dict:
@@ -374,6 +502,7 @@ async def create_task(
     if not is_safe:
         audit.log(
             event="security_incident",
+            user=_get_user(request),
             details="Blocked by Security Guard (PII Leak in prompt)",
         )
         raise HTTPException(
@@ -411,10 +540,12 @@ async def create_task(
         "error": None,
     }
 
+    user = _get_user(request)
     audit.log(
         event="task_created",
+        user=user,
         session_id=task_id,
-        filename=info["filename"],
+        filename=_sanitize_filename(info["filename"]),
         provider=provider_name,
         model=model_id or "default",
         pii_count=len(token_map),
@@ -434,6 +565,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/task/{task_id}/chat")
 async def chat_task(
+    http_request: Request,
     task_id: str,
     request: ChatRequest,
     background_tasks: BackgroundTasks,
@@ -453,14 +585,31 @@ async def chat_task(
     # SECURITY GUARD (Prompt DLP) Check
     is_safe = await guard.check_instruction(instruction)
     if not is_safe:
+        audit.log(
+            event="chat_blocked",
+            user=_get_user(http_request),
+            session_id=task_id,
+            details="Blocked by Security Guard (PII in chat)",
+        )
         raise HTTPException(
             status_code=400,
             detail="Polityka Bezpieczeństwa (Security Guard): Instrukcja zawiera chronione dane wrażliwe (PII). Usuń je z okna czatu."
         )
 
+    user = _get_user(http_request)
     task["messages"].append({"role": "user", "content": instruction})
     task["status"] = "processing"
     task["error"] = None
+    task_store.persist(task_id)
+
+    audit.log(
+        event="chat_followup",
+        user=user,
+        session_id=task_id,
+        filename=_sanitize_filename(task["filename"]),
+        provider=task["provider"],
+        message_count=len(task["messages"]),
+    )
 
     # We need the token_map from the vault
     token_map = vault.get_session(task_id)
@@ -499,7 +648,7 @@ async def get_task_status(task_id: str) -> dict:
 
 
 @app.get("/api/task/{task_id}/result")
-async def get_task_result(task_id: str) -> dict:
+async def get_task_result(request: Request, task_id: str) -> dict:
     """Get the processed result with reinjected PII."""
     task = task_store.get(task_id)
     if not task:
@@ -510,6 +659,13 @@ async def get_task_result(task_id: str) -> dict:
 
     if task["status"] == "failed":
         raise HTTPException(status_code=500, detail=task.get("error", "Unknown error"))
+
+    audit.log(
+        event="result_viewed",
+        user=_get_user(request),
+        session_id=task_id,
+        filename=_sanitize_filename(task["filename"]),
+    )
 
     return {
         "task_id": task_id,
@@ -522,11 +678,18 @@ async def get_task_result(task_id: str) -> dict:
 
 
 @app.get("/api/task/{task_id}/download")
-async def download_task_result(task_id: str):
+async def download_task_result(request: Request, task_id: str):
     """Download the processed file rebuilt in its original type."""
     task = task_store.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    audit.log(
+        event="result_downloaded",
+        user=_get_user(request),
+        session_id=task_id,
+        filename=_sanitize_filename(task["filename"]),
+    )
 
     if task["status"] != "completed":
         raise HTTPException(status_code=400, detail="Task not completed")
@@ -587,10 +750,17 @@ async def download_task_result(task_id: str):
 
 @app.get("/api/audit")
 async def get_audit_log(
+    request: Request,
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
     """Return audit log entries."""
+    audit.log(
+        event="audit_log_viewed",
+        user=_get_user(request),
+        limit=limit,
+        offset=offset,
+    )
     entries = audit.read(limit=limit, offset=offset)
     return {
         "entries": entries,
@@ -606,9 +776,11 @@ async def get_providers() -> dict:
     from providers.models_registry import get_models_for_provider, get_default_model
 
     provider_configs = [
-        {"id": "claude",  "name": "Anthropic (Claude)",  "key": settings.anthropic_api_key},
-        {"id": "openai",  "name": "OpenAI (GPT)",        "key": settings.openai_api_key},
-        {"id": "gemini",  "name": "Google (Gemini)",      "key": settings.google_ai_api_key},
+        {"id": "claude",      "name": "Anthropic (Claude)",      "key": settings.anthropic_api_key},
+        {"id": "openai",      "name": "OpenAI (GPT)",            "key": settings.openai_api_key},
+        {"id": "gemini",      "name": "Google (Gemini)",          "key": settings.google_ai_api_key},
+        {"id": "openrouter",  "name": "OpenRouter (Multi-model)", "key": settings.openrouter_api_key},
+        {"id": "ollama",      "name": "Ollama (Local)",           "key": "local"},
     ]
 
     providers = []
@@ -631,7 +803,7 @@ async def get_providers() -> dict:
 
 
 @app.get("/api/tasks")
-async def list_tasks() -> dict:
+async def list_tasks(request: Request) -> dict:
     """Return all tasks for history view."""
     tasks = []
     for task_id, task in task_store.items():
@@ -648,7 +820,71 @@ async def list_tasks() -> dict:
     return {"tasks": tasks}
 
 
-# ── Background Processing ─────────────────────────────────────────
+@app.get("/api/dashboard")
+async def get_dashboard() -> dict:
+    """Aggregate audit data into dashboard statistics."""
+    from collections import Counter, defaultdict
+
+    entries = audit.read(limit=10000, offset=0)
+
+    total_files = 0
+    total_tasks = 0
+    total_pii = 0
+    pii_breakdown: Counter = Counter()
+    provider_usage: Counter = Counter()
+    daily_activity: defaultdict[str, int] = defaultdict(int)
+    security_incidents = 0
+
+    for entry in entries:
+        event = entry.get("event", "")
+        timestamp = entry.get("timestamp", "")
+        day = timestamp[:10] if len(timestamp) >= 10 else "unknown"
+
+        if event in ("file_uploaded", "text_submitted"):
+            total_files += 1
+            total_pii += entry.get("pii_count", 0)
+            for pii_type in entry.get("pii_types", []):
+                pii_breakdown[pii_type] += 1
+            daily_activity[day] += 1
+
+        elif event == "task_created":
+            total_tasks += 1
+            provider = entry.get("provider", "unknown")
+            provider_usage[provider] += 1
+            daily_activity[day] += 1
+
+        elif event == "security_incident":
+            security_incidents += 1
+
+        elif event == "auth_failed":
+            security_incidents += 1
+
+    # Sort daily activity by date, last 30 entries
+    sorted_days = sorted(daily_activity.items())[-30:]
+
+    return {
+        "stats": {
+            "total_files": total_files,
+            "total_tasks": total_tasks,
+            "total_pii_detected": total_pii,
+            "security_incidents": security_incidents,
+            "active_sessions": len(file_store),
+            "active_tasks": len(task_store),
+        },
+        "pii_breakdown": [
+            {"type": t, "count": c}
+            for t, c in pii_breakdown.most_common(15)
+        ],
+        "provider_usage": [
+            {"provider": p, "count": c}
+            for p, c in provider_usage.most_common()
+        ],
+        "daily_activity": [
+            {"date": d, "count": c}
+            for d, c in sorted_days
+        ],
+    }
+
 
 async def _process_task(
     task_id: str,
@@ -791,6 +1027,7 @@ async def _process_task(
             task_store[task_id]["messages"].append({"role": "assistant", "content": result_text})
 
         task_store[task_id]["status"] = "completed"
+        task_store.persist(task_id)
 
         # Do not delete session or file yet, the user might want to continue chat
         # vault.delete_session(task_id)
@@ -800,14 +1037,16 @@ async def _process_task(
         #    upload_path.unlink(missing_ok=True)
 
     except Exception as exc:
-        logger.error(f"Task {task_id} failed: {exc}")
+        safe_error = _sanitize_error(str(exc))
+        logger.error(f"Task {task_id} failed: {safe_error}")
         task_store[task_id]["status"] = "failed"
-        task_store[task_id]["error"] = str(exc)
+        task_store[task_id]["error"] = safe_error
+        task_store.persist(task_id)
 
         audit.log(
             event="task_failed",
             session_id=task_id,
-            error=str(exc),
+            error=safe_error,
             data_left_boundary=False,
         )
 

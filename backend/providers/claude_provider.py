@@ -1,5 +1,5 @@
 """
-PrivateProxy — Anthropic Claude AI Provider.
+Moretta — Anthropic Claude AI Provider.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import anthropic
 
 from providers.base import AIProvider
 
-logger = logging.getLogger("privateproxy.providers.claude")
+logger = logging.getLogger("moretta.providers.claude")
 
 
 class ClaudeProvider(AIProvider):

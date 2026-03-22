@@ -1,5 +1,5 @@
 """
-PrivateProxy — AI Provider base class and factory.
+Moretta — AI Provider base class and factory.
 Abstract interface for external AI providers.
 """
 
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from config import Settings
 
-logger = logging.getLogger("privateproxy.providers")
+logger = logging.getLogger("moretta.providers")
 
 
 class AIProvider(ABC):
@@ -85,6 +85,23 @@ def get_provider(
         return GeminiProvider(
             api_key=settings.google_ai_api_key,
             model=model or get_default_model("gemini"),
+        )
+
+    elif provider_id == "openrouter":
+        if not settings.openrouter_api_key:
+            logger.error("OpenRouter provider requested but OPENROUTER_API_KEY not set")
+            return None
+        from providers.openrouter_provider import OpenRouterProvider
+        return OpenRouterProvider(
+            api_key=settings.openrouter_api_key,
+            model=model or get_default_model("openrouter"),
+        )
+
+    elif provider_id == "ollama":
+        from providers.ollama_provider import OllamaProvider
+        return OllamaProvider(
+            ollama_url=settings.ollama_url,
+            model=model or get_default_model("ollama"),
         )
 
     else:

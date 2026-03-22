@@ -1,5 +1,5 @@
 """
-PrivateProxy — Google Gemini AI Provider.
+Moretta — Google Gemini AI Provider.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import google.generativeai as genai
 
 from providers.base import AIProvider
 
-logger = logging.getLogger("privateproxy.providers.gemini")
+logger = logging.getLogger("moretta.providers.gemini")
 
 
 class GeminiProvider(AIProvider):

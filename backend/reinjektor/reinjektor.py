@@ -1,5 +1,5 @@
 """
-PrivateProxy — Reinjektor.
+Moretta — Reinjektor.
 Replaces UUID tokens in AI responses with original PII values from the vault.
 """
 
@@ -9,7 +9,7 @@ import logging
 import re
 from typing import Any
 
-logger = logging.getLogger("privateproxy.reinjektor")
+logger = logging.getLogger("moretta.reinjektor")
 
 # Pattern to match tokens like [OSOBA_a3f2], [KWOTA_b8c1], etc.
 TOKEN_PATTERN = re.compile(r"\[[A-ZĄĆĘŁŃÓŚŹŻ_]+_[a-f0-9]{4}\]")

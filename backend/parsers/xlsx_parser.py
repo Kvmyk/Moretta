@@ -1,5 +1,5 @@
 """
-PrivateProxy — XLSX file parser.
+Moretta — XLSX file parser.
 Extracts text content from Microsoft Excel spreadsheets.
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-logger = logging.getLogger("privateproxy.parsers.xlsx")
+logger = logging.getLogger("moretta.parsers.xlsx")
 
 
 from openpyxl.utils import get_column_letter

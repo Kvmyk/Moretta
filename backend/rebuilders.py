@@ -1,5 +1,5 @@
 """
-PrivateProxy — Rebuilders.
+Moretta — Rebuilders.
 Reconstruct files (DOCX, XLSX) from AI-processed text,
 preserving the original document's formatting/styles.
 """
@@ -13,7 +13,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from pathlib import Path
 
-logger = logging.getLogger("privateproxy.rebuilders")
+logger = logging.getLogger("moretta.rebuilders")
 
 
 def rebuild_xlsx(text: str, template_path: str | None = None) -> bytes:
@@ -102,7 +102,7 @@ def rebuild_xlsx(text: str, template_path: str | None = None) -> bytes:
         wb.save(stream)
         return stream.getvalue()
     except Exception as exc:
-        logger.error(f"Error in rebuild_xlsx: {exc}")
+        logger.error(f"Error in rebuild_xlsx: {str(exc)[:200]}")
         raise
 
 
@@ -198,5 +198,5 @@ def rebuild_docx(text: str, template_path: str | None = None) -> bytes:
         doc.save(stream)
         return stream.getvalue()
     except Exception as exc:
-        logger.error(f"Error in rebuild_docx: {exc}")
+        logger.error(f"Error in rebuild_docx: {str(exc)[:200]}")
         raise

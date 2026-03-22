@@ -1,5 +1,5 @@
 """
-PrivateProxy — DOCX file parser.
+Moretta — DOCX file parser.
 Extracts text content from Microsoft Word documents.
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from docx import Document
 
-logger = logging.getLogger("privateproxy.parsers.docx")
+logger = logging.getLogger("moretta.parsers.docx")
 
 
 def parse_docx(file_path: Path) -> dict[str, Any]:

@@ -1,5 +1,5 @@
 """
-PrivateProxy — Application configuration.
+Moretta — Application configuration.
 All settings are loaded from environment variables with sensible defaults.
 """
 
@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     google_ai_api_key: str = ""
+    openrouter_api_key: str = ""
 
     # ── Defaults ──────────────────────────────────────────────────
     default_provider: str = "claude"
@@ -52,6 +53,14 @@ class Settings(BaseSettings):
     @property
     def upload_dir(self) -> Path:
         return Path(self.data_dir) / "uploads"
+
+    @property
+    def store_db_path(self) -> Path:
+        return Path(self.data_dir) / "store.db"
+
+    @property
+    def blobs_dir(self) -> Path:
+        return Path(self.data_dir) / "blobs"
 
     class Config:
         env_file = ".env"

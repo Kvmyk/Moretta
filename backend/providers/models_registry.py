@@ -47,6 +47,28 @@ AVAILABLE_MODELS: dict[str, list[dict]] = {
         {"id": "gemini-2.5-flash",         "name": "Gemini 2.5 Flash",           "tier": "fast",     "context": 1_048_000},
         {"id": "gemini-2.5-flash-lite",    "name": "Gemini 2.5 Flash Lite",      "tier": "fast",     "context": 1_048_000},
     ],
+
+    "openrouter": [
+        # ── Top cross-vendor models via OpenRouter ────────────
+        {"id": "anthropic/claude-sonnet-4",          "name": "Claude Sonnet 4 (via OR)",   "tier": "flagship", "context": 1_000_000},
+        {"id": "anthropic/claude-haiku-4",           "name": "Claude Haiku 4 (via OR)",    "tier": "fast",     "context": 200_000},
+        {"id": "openai/gpt-5.4",                    "name": "GPT-5.4 (via OR)",           "tier": "flagship", "context": 272_000},
+        {"id": "google/gemini-2.5-flash",            "name": "Gemini 2.5 Flash (via OR)",  "tier": "fast",     "context": 1_048_000},
+        {"id": "meta-llama/llama-4-maverick",        "name": "Llama 4 Maverick (via OR)",  "tier": "standard", "context": 1_000_000},
+        {"id": "mistralai/mistral-large",            "name": "Mistral Large (via OR)",     "tier": "standard", "context": 128_000},
+        {"id": "deepseek/deepseek-r1",               "name": "DeepSeek R1 (via OR)",       "tier": "standard", "context": 128_000},
+        {"id": "qwen/qwen3-235b-a22b",               "name": "Qwen 3 235B (via OR)",       "tier": "flagship", "context": 128_000},
+    ],
+
+    "ollama": [
+        # ── Local models (must be pulled via `ollama pull`) ───
+        {"id": "llama3.3:8b",     "name": "Llama 3.3 8B",      "tier": "standard", "context": 128_000},
+        {"id": "qwen2.5:7b",      "name": "Qwen 2.5 7B",       "tier": "standard", "context": 128_000},
+        {"id": "mistral:7b",      "name": "Mistral 7B",         "tier": "standard", "context": 32_000},
+        {"id": "phi4-mini",        "name": "Phi-4 Mini",         "tier": "fast",     "context": 16_000},
+        {"id": "deepseek-r1:8b",   "name": "DeepSeek R1 8B",     "tier": "standard", "context": 128_000},
+        {"id": "gemma3:12b",       "name": "Gemma 3 12B",        "tier": "standard", "context": 128_000},
+    ],
 }
 
 
@@ -54,6 +76,8 @@ DEFAULT_MODELS = {
     "claude": "claude-sonnet-4-6-20260217",
     "openai": "gpt-5.4",
     "gemini": "gemini-2.5-flash",
+    "openrouter": "anthropic/claude-sonnet-4",
+    "ollama": "llama3.3:8b",
 }
 
 

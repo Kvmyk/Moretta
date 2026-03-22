@@ -1,5 +1,5 @@
 """
-PrivateProxy — PII Replacer.
+Moretta — PII Replacer.
 Generates UUID-based tokens and substitutes PII in text.
 """
 

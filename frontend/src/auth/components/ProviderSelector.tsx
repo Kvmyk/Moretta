@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../auth/apiFetch';
+import { apiFetch } from '../apiFetch';
 
 interface Model {
   id: string;

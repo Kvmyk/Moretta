@@ -1,18 +1,19 @@
 """
-PrivateProxy — Encrypted PII Vault.
+Moretta — Encrypted PII Vault.
 Stores session-based token ↔ original PII mappings in encrypted SQLite.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("privateproxy.vault")
+logger = logging.getLogger("moretta.vault")
 
 
 class Vault:
@@ -29,11 +30,15 @@ class Vault:
 
         # Apply encryption if key is provided
         if self._encryption_key:
-            try:
-                conn.execute(f"PRAGMA key = '{self._encryption_key}'")
-                logger.debug("Vault encryption enabled")
-            except Exception as exc:
-                logger.warning(f"SQLite encryption not available: {exc}. Running unencrypted.")
+            # Validate key format: only hex characters, 32-64 chars long
+            if not re.fullmatch(r"[0-9a-fA-F]{32,64}", self._encryption_key):
+                logger.error("Vault encryption key must be 32-64 hex characters. Running unencrypted.")
+            else:
+                try:
+                    conn.execute("PRAGMA key = ?", (self._encryption_key,))
+                    logger.debug("Vault encryption enabled")
+                except Exception as exc:
+                    logger.warning(f"SQLite encryption not available: {exc}. Running unencrypted.")
 
         return conn
 

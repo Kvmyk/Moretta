@@ -1,5 +1,5 @@
 """
-PrivateProxy — Audit Logger.
+Moretta — Audit Logger.
 Append-only JSONL log for compliance and security auditing.
 """
 
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("privateproxy.audit")
+logger = logging.getLogger("moretta.audit")
 
 
 class AuditLogger:

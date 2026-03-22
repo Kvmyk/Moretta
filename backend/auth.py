@@ -38,22 +38,15 @@ class OIDCValidator:
                 algorithms=["RS256"],
                 options={"verify_aud": False, "verify_iss": False},
             )
+        except jwt.InvalidIssuerError:
+            raise AuthError("Token issuer is not trusted")
+        except jwt.InvalidAudienceError:
+            raise AuthError("Token audience is not allowed")
         except Exception as exc:
-            import traceback
-            traceback.print_exc()
-            print(f"Token decode error: {exc}", flush=True)
             raise AuthError(f"Invalid or expired token: {exc}") from exc
 
         azp = payload.get("azp")
-        aud = payload.get("aud", [])
-        if isinstance(aud, str):
-            aud = [aud]
-
-        print(f"Token payload azp: {azp}, aud: {aud}, allowed: {self._config.allowed_client_ids}", flush=True)
-
-        if azp not in self._config.allowed_client_ids and not any(
-            client_id in aud for client_id in self._config.allowed_client_ids
-        ):
-            raise AuthError("Token audience/client is not allowed")
+        if azp and azp not in self._config.allowed_client_ids:
+            raise AuthError("Token authorized party (azp) is not allowed")
 
         return payload

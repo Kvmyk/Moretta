@@ -1,5 +1,5 @@
 """
-PrivateProxy — Email file parser.
+Moretta — Email file parser.
 Extracts text content from EML and MSG email files.
 """
 
@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("privateproxy.parsers.email")
+logger = logging.getLogger("moretta.parsers.email")
 
 
 def parse_email(file_path: Path) -> dict[str, Any]:

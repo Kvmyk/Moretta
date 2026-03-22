@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import PiiDetectionCard from '../components/PiiDetectionCard';
-import ProviderSelector from '../components/ProviderSelector';
+import PiiDetectionCard from '../auth/components/PiiDetectionCard';
+import ProviderSelector from '../auth/components/ProviderSelector';
 import { apiFetch } from '../auth/apiFetch';
 
 interface PiiType {

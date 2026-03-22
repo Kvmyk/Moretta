@@ -96,6 +96,7 @@ function Settings() {
               <div><span className="text-pp-accent">ANTHROPIC_API_KEY</span>=sk-ant-...</div>
               <div><span className="text-pp-accent">OPENAI_API_KEY</span>=sk-...</div>
               <div><span className="text-pp-accent">GOOGLE_AI_API_KEY</span>=AI...</div>
+              <div><span className="text-pp-accent">OPENROUTER_API_KEY</span>=sk-or-...</div>
               <div><span className="text-pp-accent">DEFAULT_PROVIDER</span>=claude</div>
             </pre>
           </div>

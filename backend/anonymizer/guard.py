@@ -1,5 +1,5 @@
 """
-PrivateProxy — AI Security Guard (Prompt DLP).
+Moretta — AI Security Guard (Prompt DLP).
 Uses a local LLM to verify if user instructions contain unauthorized PII.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx
 import logging
 
-logger = logging.getLogger("privateproxy.guard")
+logger = logging.getLogger("moretta.guard")
 
 
 class SecurityGuard:
@@ -55,15 +55,14 @@ class SecurityGuard:
             raw_response = data.get("response", "").strip().upper()
 
             if "ZAGROZENIE" in raw_response and "CZYSTE" not in raw_response:
-                logger.warning(f"Security Guard blocked prompt: {instruction[:100]}... (LLM said: {raw_response})")
+                logger.warning(f"Security Guard BLOCKED prompt ({len(instruction)} chars). LLM verdict: {raw_response}")
                 return False
             
             # If it responds with CZYSTE or hallucinated something else, allow
-            logger.info(f"Security Guard check passed (LLM said: {raw_response})")
+            logger.info(f"Security Guard check PASSED ({len(instruction)} chars)")
             return True
 
         except Exception as exc:
-            logger.error(f"Security Guard check failed: {exc}")
-            # Fail-open: if the local LLM is down, we allow it (or change to fail-closed depending on policy)
-            # For resilience, we return True here, but log the error heavily.
-            return True
+            logger.critical(f"Security Guard check failed (BLOCKING request): {exc}")
+            # Fail-closed: if the local LLM is down, we block the request for safety.
+            return False

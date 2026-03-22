@@ -1,5 +1,5 @@
 """
-PrivateProxy — PII Detection pipeline.
+Moretta — PII Detection pipeline.
 Stage 1: Microsoft Presidio (deterministic, rule-based)
 Stage 2: Local LLM via Ollama (contextual, business-specific)
 """
@@ -14,7 +14,7 @@ import httpx
 from presidio_analyzer import AnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 
-logger = logging.getLogger("privateproxy.detector")
+logger = logging.getLogger("moretta.detector")
 
 # ── Polish PII type names ──────────────────────────────────────────
 
@@ -173,8 +173,11 @@ class PiiDetector:
             if overlap_end > overlap_start:
                 overlap_len = overlap_end - overlap_start
                 item_len = item.get("end", 0) - item.get("start", 0)
-                if item_len > 0 and overlap_len / item_len >= overlap_threshold:
-                    return True
+                ex_len = ex.get("end", 0) - ex.get("start", 0)
+                if item_len > 0 and ex_len > 0:
+                    # Treat as duplicate if it significantly completely covers or is covered by another
+                    if overlap_len / min(item_len, ex_len) >= overlap_threshold:
+                        return True
         return False
 
     async def detect_deep_async(self, text: str, existing_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -195,7 +198,8 @@ class PiiDetector:
             "- MUSISZ odpowiedzieć WYŁĄCZNIE i ZAWSZE jako surowa techniczna tablica JSON.\n"
             '- ZABRONIONE jest dodawanie JAKIEGOKOLWIEK tekstu poza JSON-em (żadnych słów typu "Oto wynik", "Zrozumiałem", żadnych uwag).\n'
             "- ZABRONIONE jest używanie znaczników markdown (np. ```json). Odpowiedź musi zaczynać się jawnie od znaku `[` i kończyć na `]`.\n"
-            '- Zwracane klucze w każdym obiekcie JSON to: "text" (dokładny znaleziony fragment z tekstu), "type" (odpowiednia kategoria z listy powyżej).\n\n'
+            '- WYCIĄGAJ TYLKO ŚCISŁĄ WARTOŚĆ DANYCH (np. samo imię i nazwisko, sam pojedynczy adres IP, sam kod). ABSOLUTNIE ZABRONIONE jest kopiowanie całych zdań, słów wprowadzających czy tekstu otaczającego. Detekcja musi być najkrótsza z możliwych!\n'
+            '- Zwracane klucze w każdym obiekcie JSON to: "text" (dokładny znaleziony krótki fragment tekstu), "type" (odpowiednia kategoria z listy powyżej).\n\n'
             "Przykładowa pożądana odpowiedź:\n"
             "[\n"
             '  {"text": "Projekt Apollo", "type": "SECRET_PROJECT"},\n'

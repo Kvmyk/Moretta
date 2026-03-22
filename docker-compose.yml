@@ -58,10 +58,13 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME: http://localhost:3000
+      KC_HOSTNAME_ADMIN: http://localhost:8080/auth
       KC_HTTP_RELATIVE_PATH: /auth
     volumes:
       - ./keycloak/realm-moretta.json:/opt/keycloak/data/import/realm-moretta.json:ro
       - ./keycloak/themes/moretta:/opt/keycloak/themes/moretta:ro
+    ports:
+      - "8080:8080"
     restart: unless-stopped
     networks:
       - privateproxy-net
