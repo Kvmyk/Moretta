@@ -122,4 +122,5 @@ Moretta implements a PII-safe logging strategy. The system maintains two log str
 **Retention:** The audit log file is append-only and not automatically rotated. For production use, configure log rotation via Docker or an external tool (e.g. `logrotate`).
 
 ## License
-MIT License
+
+GNU AGPLv3 — This project is licensed under the GNU Affero General Public License v3.0. See the [LICENSE](LICENSE) file for the full text. This ensures that Moretta remains open-source, even when provided as a network service.
