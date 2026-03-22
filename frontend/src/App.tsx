@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import keycloak from './auth/keycloak';
+import Logo from './components/Logo';
 
 function App() {
   return (
@@ -14,8 +15,10 @@ function App() {
         <aside className="w-64 bg-pp-surface border-r border-pp-border flex flex-col shrink-0">
           {/* Logo */}
           <div className="p-6 border-b border-pp-border">
-            <h1 className="text-xl font-bold text-white tracking-widest uppercase">Moretta</h1>
-            <p className="text-[10px] text-pp-accent-light opacity-80 mt-1 uppercase tracking-[0.2em] font-medium">v0.7</p>
+            <NavLink to="/" className="hover:opacity-90 transition-opacity inline-block">
+              <Logo size={40} showText />
+            </NavLink>
+            <p className="text-[9px] text-pp-accent-light opacity-60 mt-2 uppercase tracking-[0.25em] font-medium ml-[52px]">v0.7 Early Access</p>
             <div className="mt-4 text-xs text-pp-text-muted">
               <div className="truncate">{keycloak.tokenParsed?.preferred_username ?? 'authenticated-user'}</div>
               <button

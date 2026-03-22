@@ -7,8 +7,8 @@
   --m-border: #1f1e26;
   --m-text: #f5f5f5;
   --m-muted: #7a7a7a;
-  --m-accent: #a295ba;
-  --m-accent-light: #dbd5e5;
+  --m-accent: #beb4d1;
+  --m-accent-light: #ede8f2;
 }
 
 body.login-pf,
@@ -66,6 +66,18 @@ body.login-pf,
   text-transform: uppercase;
   color: var(--m-accent-light);
   text-align: center;
+}
+
+#kc-header-wrapper::before {
+  content: "";
+  display: block;
+  width: 100px;
+  height: 110px;
+  margin: 0 auto 1.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='10 0 180 200'%3E%3Cdefs%3E%3CradialGradient id='gf' cx='50%25' cy='30%25' r='70%25'%3E%3Cstop offset='0%25' stop-color='%23322a40' /%3E%3Cstop offset='100%25' stop-color='%23050407' /%3E%3C/radialGradient%3E%3CradialGradient id='gn' cx='50%25' cy='45%25' r='40%25'%3E%3Cstop offset='0%25' stop-color='rgba(200,190,240,0.07)' /%3E%3Cstop offset='100%25' stop-color='transparent' /%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M100 10 C72 10,47 30,35 60 C25 90,25 115,35 140 C45 165,68 180,82 185 C92 188,108 188,118 185 C132 180,155 165,165 140 C175 115,175 90,165 60 C155 30,128 10,100 10Z' fill='url(%23gf)' /%3E%3Cellipse cx='100' cy='95' rx='8' ry='40' fill='url(%23gn)' /%3E%3Ccircle cx='68' cy='82' r='18' fill='%23000' /%3E%3Ccircle cx='132' cy='82' r='18' fill='%23000' /%3E%3Cellipse cx='100' cy='150' rx='10' ry='3' fill='%23000' /%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 15px 30px rgba(0,0,0,0.6));
 }
 
 @media (max-width: 980px) {
