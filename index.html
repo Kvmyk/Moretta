@@ -676,22 +676,47 @@
 
         .mask-wrap {
             position: relative;
-            margin-bottom: 60px;
+            margin-bottom: 36px;
             z-index: 1;
-            animation: breathe 9s ease-in-out infinite;
         }
 
-        @keyframes breathe {
+        .mask-svg {
+            animation: maskFloat 7s ease-in-out infinite;
+            filter: drop-shadow(0 0 40px rgba(100, 80, 160, 0.12));
+        }
 
-            0%,
-            100% {
+        .mask-shadow {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 110px;
+            height: 16px;
+            background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: shadowPulse 7s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes maskFloat {
+            0%, 100% {
                 transform: translateY(0px);
-                filter: drop-shadow(0 4px 40px rgba(0, 0, 0, 0.99)) drop-shadow(0 0 50px rgba(80, 60, 120, 0.10));
+                filter: drop-shadow(0 4px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 50px rgba(100, 80, 160, 0.12));
             }
-
             50% {
-                transform: translateY(-14px);
-                filter: drop-shadow(0 12px 56px rgba(0, 0, 0, 0.99)) drop-shadow(0 0 80px rgba(100, 80, 150, 0.20));
+                transform: translateY(-18px);
+                filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 80px rgba(120, 95, 180, 0.22));
+            }
+        }
+
+        @keyframes shadowPulse {
+            0%, 100% {
+                transform: translateX(-50%) scaleX(1) scaleY(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: translateX(-50%) scaleX(1.4) scaleY(0.6);
+                opacity: 0.35;
             }
         }
 
@@ -831,100 +856,82 @@
     <!-- ── HERO ── -->
     <section class="hero">
         <div class="mask-wrap">
-            <svg width="200" height="260" viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="mask-svg" width="180" height="200" viewBox="10 0 180 200" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <radialGradient id="gf" cx="50%" cy="30%" r="65%">
-                        <stop offset="0%" stop-color="#252030" />
-                        <stop offset="35%" stop-color="#171320" />
-                        <stop offset="70%" stop-color="#0f0c16" />
-                        <stop offset="100%" stop-color="#080610" />
+                    <!-- Velvet base material (rich deep purplish black) -->
+                    <radialGradient id="gf" cx="50%" cy="30%" r="70%">
+                        <stop offset="0%" stop-color="#322a40" />
+                        <stop offset="40%" stop-color="#1f1a29" />
+                        <stop offset="75%" stop-color="#110e17" />
+                        <stop offset="100%" stop-color="#050407" />
                     </radialGradient>
-                    <linearGradient id="gb" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(184,175,210,0)" />
-                        <stop offset="30%" stop-color="rgba(184,175,210,0.15)" />
-                        <stop offset="50%" stop-color="rgba(220,212,238,0.38)" />
-                        <stop offset="70%" stop-color="rgba(184,175,210,0.15)" />
-                        <stop offset="100%" stop-color="rgba(184,175,210,0)" />
-                    </linearGradient>
-                    <linearGradient id="grl" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(184,175,200,0.30)" />
-                        <stop offset="100%" stop-color="rgba(184,175,200,0)" />
-                    </linearGradient>
-                    <linearGradient id="grr" x1="100%" y1="0%" x2="0%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(184,175,200,0.30)" />
-                        <stop offset="100%" stop-color="rgba(184,175,200,0)" />
-                    </linearGradient>
-                    <radialGradient id="gel" cx="45%" cy="40%" r="55%">
-                        <stop offset="0%" stop-color="#010102" />
-                        <stop offset="55%" stop-color="#050408" />
-                        <stop offset="100%" stop-color="#0d0b14" />
+                    
+                    <!-- 3D Form shaping highlights (Cheeks & Brow) -->
+                    <radialGradient id="g-form" cx="50%" cy="45%" r="65%">
+                        <stop offset="0%" stop-color="rgba(180, 160, 220, 0.08)" />
+                        <stop offset="35%" stop-color="rgba(180, 160, 220, 0.02)" />
+                        <stop offset="80%" stop-color="rgba(180, 160, 220, 0)" />
                     </radialGradient>
-                    <radialGradient id="ger" cx="55%" cy="40%" r="55%">
-                        <stop offset="0%" stop-color="#010102" />
-                        <stop offset="55%" stop-color="#050408" />
-                        <stop offset="100%" stop-color="#0d0b14" />
-                    </radialGradient>
-                    <clipPath id="cm">
-                        <path
-                            d="M100 12 C68 12,36 30,22 58 C10 82,10 112,20 136 C30 158,48 172,70 180 C84 186,92 188,100 188 C108 188,116 186,130 180 C152 172,170 158,180 136 C190 112,190 82,178 58 C164 30,132 12,100 12Z" />
-                    </clipPath>
+
+                    <!-- Velvet rim light (Fresnel effect) along the edge -->
+                    <linearGradient id="g-rim" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(200, 190, 240, 0.25)" />
+                        <stop offset="15%" stop-color="rgba(200, 190, 240, 0.05)" />
+                        <stop offset="50%" stop-color="rgba(200, 190, 240, 0)" />
+                        <stop offset="85%" stop-color="rgba(200, 190, 240, 0.05)" />
+                        <stop offset="100%" stop-color="rgba(200, 190, 240, 0.25)" />
+                    </linearGradient>
+
+                    <!-- Eye socket depth (subtle internal volume) -->
+                    <linearGradient id="g-eye" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#020103" />
+                        <stop offset="100%" stop-color="#161221" />
+                    </linearGradient>
                 </defs>
-                <ellipse cx="100" cy="210" rx="55" ry="8" fill="rgba(0,0,0,0.50)" />
-                <path
-                    d="M100 12 C68 12,36 30,22 58 C10 82,10 112,20 136 C30 158,48 172,70 180 C84 186,92 188,100 188 C108 188,116 186,130 180 C152 172,170 158,180 136 C190 112,190 82,178 58 C164 30,132 12,100 12Z"
-                    fill="url(#gf)" />
-                <g clip-path="url(#cm)" opacity="0.035">
-                    <line x1="70" y1="12" x2="67" y2="188" stroke="white" stroke-width="0.5" />
-                    <line x1="85" y1="12" x2="83" y2="188" stroke="white" stroke-width="0.4" />
-                    <line x1="100" y1="12" x2="100" y2="188" stroke="white" stroke-width="0.5" />
-                    <line x1="115" y1="12" x2="117" y2="188" stroke="white" stroke-width="0.4" />
-                    <line x1="130" y1="12" x2="133" y2="188" stroke="white" stroke-width="0.5" />
-                </g>
-                <path d="M100 12 C68 12,36 30,22 58 C10 82,10 112,20 136 C30 158,48 172,70 180" stroke="url(#grl)"
-                    stroke-width="1.8" fill="none" />
-                <path d="M100 12 C132 12,164 30,178 58 C190 82,190 112,180 136 C170 158,152 172,130 180"
-                    stroke="url(#grr)" stroke-width="1.8" fill="none" />
-                <path d="M36 42 Q100 16 164 42" stroke="url(#gb)" stroke-width="2.2" fill="none" />
-                <path d="M70 180 Q100 192 130 180" stroke="rgba(184,175,210,0.11)" stroke-width="1" fill="none" />
-                <path d="M40 90 C46 76,60 70,74 73 C84 75,87 84,84 94 C81 104,67 110,53 107 C39 104,34 100,40 90Z"
-                    fill="#0b0914" />
-                <path d="M43 90 C49 77,62 72,74 75 C83 77,85 85,82 94 C79 103,67 108,54 105 C42 102,37 98,43 90Z"
-                    fill="url(#gel)" />
-                <path d="M43 90 C49 77,62 72,74 75 C83 77,85 85,82 94 C79 103,67 108,54 105 C42 102,37 98,43 90Z"
-                    fill="none" stroke="rgba(184,175,200,0.20)" stroke-width="0.8" />
-                <path d="M45 88 C51 77,63 72,74 75" stroke="rgba(220,212,238,0.44)" stroke-width="1.3" fill="none"
-                    stroke-linecap="round" />
-                <path d="M43 90 C49 77,62 72,74 75 C83 77,85 85,82 94" fill="none" stroke="rgba(0,0,0,0.65)"
-                    stroke-width="3.5" stroke-linecap="round" />
-                <path
-                    d="M160 90 C154 76,140 70,126 73 C116 75,113 84,116 94 C119 104,133 110,147 107 C161 104,166 100,160 90Z"
-                    fill="#0b0914" />
-                <path
-                    d="M157 90 C151 77,138 72,126 75 C117 77,115 85,118 94 C121 103,133 108,146 105 C158 102,163 98,157 90Z"
-                    fill="url(#ger)" />
-                <path
-                    d="M157 90 C151 77,138 72,126 75 C117 77,115 85,118 94 C121 103,133 108,146 105 C158 102,163 98,157 90Z"
-                    fill="none" stroke="rgba(184,175,200,0.20)" stroke-width="0.8" />
-                <path d="M155 88 C149 77,137 72,126 75" stroke="rgba(220,212,238,0.44)" stroke-width="1.3" fill="none"
-                    stroke-linecap="round" />
-                <path d="M157 90 C151 77,138 72,126 75 C117 77,115 85,118 94" fill="none" stroke="rgba(0,0,0,0.65)"
-                    stroke-width="3.5" stroke-linecap="round" />
-                <path d="M84 100 Q100 112 116 100" stroke="rgba(0,0,0,0.22)" stroke-width="2.5" fill="none"
-                    stroke-linecap="round" />
-                <ellipse cx="94" cy="136" rx="4" ry="2.8" fill="rgba(0,0,0,0.16)" />
-                <ellipse cx="106" cy="136" rx="4" ry="2.8" fill="rgba(0,0,0,0.16)" />
-                <path d="M72 165 Q100 174 128 165" stroke="rgba(0,0,0,0.18)" stroke-width="5" fill="none"
-                    stroke-linecap="round" />
-                <circle cx="100" cy="176" r="3.5" fill="#0d0b16" stroke="rgba(184,175,200,0.20)" stroke-width="0.7" />
-                <circle cx="100" cy="176" r="1.2" fill="rgba(184,175,200,0.14)" />
-                <path d="M22 96 Q10 90 2 85" stroke="rgba(184,175,200,0.12)" stroke-width="0.9" fill="none" />
-                <path d="M178 96 Q190 90 198 85" stroke="rgba(184,175,200,0.12)" stroke-width="0.9" fill="none" />
-                <path d="M62 186 Q56 208 60 228" stroke="rgba(110,90,150,0.07)" stroke-width="1.1" fill="none" />
-                <path d="M80 188 Q76 210 78 232" stroke="rgba(110,90,150,0.05)" stroke-width="0.9" fill="none" />
-                <path d="M100 188 Q100 212 100 236" stroke="rgba(110,90,150,0.06)" stroke-width="0.9" fill="none" />
-                <path d="M120 188 Q124 210 122 232" stroke="rgba(110,90,150,0.05)" stroke-width="0.9" fill="none" />
-                <path d="M138 186 Q144 208 140 228" stroke="rgba(110,90,150,0.07)" stroke-width="1.1" fill="none" />
+
+                <!-- 1. BASE MASK SHAPE -->
+                <path id="mask-base" d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" fill="url(#gf)" />
+                
+                <!-- 2. VOLUME / 3D SCULPTING (Cheekbones & Forehead) -->
+                <!-- Forehead curve highlight -->
+                <path d="M40 45 Q100 15 160 45 Q100 70 40 45Z" fill="rgba(200, 190, 230, 0.04)" filter="blur(6px)" />
+                <!-- Left cheekbone contour highlight -->
+                <path d="M30 95 Q60 110 50 140 Q25 120 30 95Z" fill="rgba(200, 190, 230, 0.03)" filter="blur(8px)" />
+                <!-- Right cheekbone contour highlight -->
+                <path d="M170 95 Q140 110 150 140 Q175 120 170 95Z" fill="rgba(200, 190, 230, 0.03)" filter="blur(8px)" />
+                
+                <!-- Soft form overlay to blend it all -->
+                <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" fill="url(#g-form)" />
+
+                <!-- 3. VENETIAN TRIM (Elegant edge styling) -->
+                <!-- Ambient Rim Light -->
+                <path d="M100 10 C72 10,42 30,30 60 C20 85,22 115,32 138 C42 158,58 172,76 180 C88 185,94 187,100 187 C106 187,112 185,124 180 C142 172,158 158,168 138 C178 115,180 85,170 60 C158 30,128 10,100 10Z" stroke="url(#g-rim)" stroke-width="2.5" fill="none" />
+                
+                <!-- Inner silver piping / stitching -->
+                <path d="M100 14 C75 14,47 32,35 61 C26 85,28 113,38 135 C47 153,62 166,78 173 C89 178,95 180,100 180 C105 180,111 178,122 173 C138 166,153 153,162 135 C172 113,174 85,165 61 C153 32,125 14,100 14Z" stroke="rgba(190, 180, 220, 0.15)" stroke-width="0.8" fill="none" stroke-dasharray="3 2" />
+
+                <!-- 4. EYES (Simple, mysterious deep cuts) -->
+                <!-- Left Eye -->
+                <!-- Smooth velvet edge catchlight -->
+                <path d="M52 82 C52 72, 62 68, 72 68 C82 68, 88 74, 88 82 C88 90, 80 94, 70 94 C60 94, 52 90, 52 82Z" fill="none" stroke="rgba(200, 190, 230, 0.15)" stroke-width="1.2" />
+                <!-- The void (with depth gradient) -->
+                <path d="M53 82 C53 73, 62 69, 72 69 C81 69, 87 75, 87 82 C87 89, 80 93, 70 93 C61 93, 53 89, 53 82Z" fill="url(#g-eye)" />
+                <!-- Inner depth rim (bottom light catch) -->
+                <path d="M55 86 C60 92, 80 92, 85 86" fill="none" stroke="rgba(220, 212, 240, 0.08)" stroke-width="1" stroke-linecap="round" />
+                <!-- Subtle inner shadow/depth top -->
+                <path d="M53 82 C53 73, 62 69, 72 69 C81 69, 87 75, 87 82" fill="none" stroke="#000000" stroke-width="2" />
+
+                <!-- Right Eye -->
+                <!-- Smooth velvet edge catchlight -->
+                <path d="M112 82 C112 74, 118 68, 128 68 C138 68, 148 72, 148 82 C148 90, 140 94, 130 94 C120 94, 112 90, 112 82Z" fill="none" stroke="rgba(200, 190, 240, 0.15)" stroke-width="1.2" />
+                <!-- The void (with depth gradient) -->
+                <path d="M113 82 C113 75, 119 69, 128 69 C137 69, 147 73, 147 82 C147 89, 139 93, 130 93 C121 93, 113 89, 113 82Z" fill="url(#g-eye)" />
+                <!-- Inner depth rim (bottom light catch) -->
+                <path d="M115 86 C120 92, 140 92, 145 86" fill="none" stroke="rgba(220, 212, 240, 0.08)" stroke-width="1" stroke-linecap="round" />
+                <!-- Subtle inner shadow/depth top -->
+                <path d="M113 82 C113 75, 119 69, 128 69 C137 69, 147 73, 147 82" fill="none" stroke="#000000" stroke-width="2" />
             </svg>
+            <div class="mask-shadow"></div>
         </div>
         <p class="hero-eyebrow">Open-source · Self-hosted · Privacy by architecture</p>
         <h1 class="hero-title">MORETTA</h1>
