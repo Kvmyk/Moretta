@@ -198,8 +198,9 @@ class PiiDetector:
             "- MUSISZ odpowiedzieć WYŁĄCZNIE i ZAWSZE jako surowa techniczna tablica JSON.\n"
             '- ZABRONIONE jest dodawanie JAKIEGOKOLWIEK tekstu poza JSON-em (żadnych słów typu "Oto wynik", "Zrozumiałem", żadnych uwag).\n'
             "- ZABRONIONE jest używanie znaczników markdown (np. ```json). Odpowiedź musi zaczynać się jawnie od znaku `[` i kończyć na `]`.\n"
-            '- WYCIĄGAJ TYLKO ŚCISŁĄ WARTOŚĆ DANYCH (np. samo imię i nazwisko, sam pojedynczy adres IP, sam kod). ABSOLUTNIE ZABRONIONE jest kopiowanie całych zdań, słów wprowadzających czy tekstu otaczającego. Detekcja musi być najkrótsza z możliwych!\n'
-            '- Zwracane klucze w każdym obiekcie JSON to: "text" (dokładny znaleziony krótki fragment tekstu), "type" (odpowiednia kategoria z listy powyżej).\n\n'
+            '- WYCIĄGAJ FRAGMENTY TEKSTU DOKŁADNIE TAK, JAK WYSTĘPUJĄ W ORYGINALE. Literalnie, bez poprawiania gramatyki, bez odmieniania, bez usuwania końcówek. Jeśli w oryginale jest "Projektu", wyciągnij "Projektu", a nie "Projekt".\n'
+            '- Detekcja musi być najkrótsza z możliwych (samo słowo/klucz), bez słów wprowadzających.\n'
+            '- Zwracane klucze w każdym obiekcie JSON to: "text" (dokładny fragment z tekstu), "type" (odpowiednia kategoria z listy powyżej).\n\n'
             "Przykładowa pożądana odpowiedź:\n"
             "[\n"
             '  {"text": "Projekt Apollo", "type": "SECRET_PROJECT"},\n'
@@ -210,6 +211,7 @@ class PiiDetector:
             "[]\n\n"
             f"Tekst:\n{fragment}"
         )
+
 
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -238,24 +240,36 @@ class PiiDetector:
             new_results = []
             for item in items:
                 if isinstance(item, dict) and "text" in item and "type" in item:
-                    # Treat start/end loosely since LLM might hallucinate indexes, fallback to string matching
-                    text_found = item["text"]
-                    if text_found in text:
-                        start_real = text.find(text_found)
-                        end_real = start_real + len(text_found)
-                        
+                    text_found = item["text"].strip()
+                    if not text_found:
+                        continue
+
+                    # Try to find all occurrences of this text (case-insensitive)
+                    pattern = re.compile(re.escape(text_found), re.IGNORECASE)
+                    matches_found = list(pattern.finditer(text))
+                    
+                    if not matches_found and len(text_found) > 3:
+                        # Fallback for Polish declension: if it's a longer string, try matching the prefix 
+                        # or allow minor character differences at the end.
+                        # We use a fuzzy regex that allows some characters after the word core.
+                        core = text_found[:-1] if len(text_found) > 4 else text_found
+                        fuzzy_pattern = re.compile(re.escape(core) + r"[a-ząęółńśćźż]{0,3}", re.IGNORECASE)
+                        matches_found = list(fuzzy_pattern.finditer(text))
+
+                    for match in matches_found:
                         pii_entry = {
-                            "text": text_found,
+                            "text": text[match.start():match.end()], # Extract ACTUAL literal text
                             "type": item.get("type", "OTHER_PII"),
-                            "start": start_real,
-                            "end": end_real,
+                            "start": match.start(),
+                            "end": match.end(),
                             "score": 0.6,
                             "source": "ollama_deep",
                         }
-                        if not self._is_duplicate(pii_entry, existing_results):
+                        if not self._is_duplicate(pii_entry, existing_results) and not self._is_duplicate(pii_entry, new_results):
                             new_results.append(pii_entry)
+
             
-            logger.info(f"Ollama deep scan detected {len(new_results)} additional PII entities")
+            logger.info(f"Ollama deep scan finished. Detected {len(new_results)} new entities. Raw LLM response: {raw_response}")
             return new_results
 
         except Exception as exc:
