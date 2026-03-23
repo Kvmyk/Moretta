@@ -143,11 +143,21 @@ class PiiDetector:
         for rule in POLISH_REGEX_RULES:
             pattern = re.compile(rule["pattern"], re.IGNORECASE)
             for match in pattern.finditer(text):
+                matched_text = match.group()
+                # Strip leading/trailing whitespace and adjust indices
+                stripped_text = matched_text.strip()
+                if not stripped_text:
+                    continue
+                    
+                start_offset = matched_text.find(stripped_text)
+                actual_start = match.start() + start_offset
+                actual_end = actual_start + len(stripped_text)
+                
                 results.append({
-                    "text": match.group(),
+                    "text": stripped_text,
                     "type": rule["type"],
-                    "start": match.start(),
-                    "end": match.end(),
+                    "start": actual_start,
+                    "end": actual_end,
                     "score": 0.85,
                     "source": "regex",
                 })
