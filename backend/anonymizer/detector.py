@@ -269,7 +269,7 @@ class PiiDetector:
                             new_results.append(pii_entry)
 
             
-            logger.info(f"Ollama deep scan finished. Detected {len(new_results)} new entities. Raw LLM response: {raw_response}")
+            logger.info(f"Ollama deep scan finished. Detected {len(new_results)} new entities.")
             return new_results
 
         except Exception as exc:
