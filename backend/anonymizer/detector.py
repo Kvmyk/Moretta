@@ -193,7 +193,7 @@ class PiiDetector:
     async def detect_deep_async(self, text: str, existing_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Stage 2: Asynchronous Deep Scan via local LLM (Ollama)."""
         # Truncate very long texts to fit model context
-        MAX_CHARS = 8000
+        MAX_CHARS = 4000
         fragment = text[:MAX_CHARS] if len(text) > MAX_CHARS else text
 
         prompt = (
