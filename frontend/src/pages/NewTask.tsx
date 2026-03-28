@@ -65,8 +65,18 @@ function NewTask() {
   const [taskStatus, setTaskStatus] = useState<string | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
+  const [pendingInstruction, setPendingInstruction] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 220) + 'px';
+  };
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -242,6 +252,12 @@ function NewTask() {
       }
       return res.json() as Promise<TaskResult>;
     },
+    onMutate: () => {
+      // Show the instruction immediately as a user bubble
+      if (instruction.trim()) {
+        setPendingInstruction(instruction);
+      }
+    },
     onSuccess: (data) => {
       setSecurityError(null);
       setTaskId(data.task_id);
@@ -251,6 +267,7 @@ function NewTask() {
     },
     onError: (error: Error) => {
       setSecurityError(error.message);
+      setPendingInstruction(null);
     }
   });
 
@@ -266,14 +283,17 @@ function NewTask() {
         } else if (data.status === 'completed') {
           setStep('done');
           setPendingChatMessage(null);
+          setPendingInstruction(null);
         } else {
           setStep('done'); // Even if failed
           setPendingChatMessage(null);
+          setPendingInstruction(null);
         }
       } catch {
         setTaskStatus('failed');
         setStep('done');
         setPendingChatMessage(null);
+        setPendingInstruction(null);
       }
     };
     poll();
@@ -326,6 +346,11 @@ function NewTask() {
     setTaskStatus(null);
     setSecurityError(null);
     setChatInput('');
+    setPendingInstruction(null);
+    setPendingChatMessage(null);
+    // Reset textarea heights
+    if (chatTextareaRef.current) chatTextareaRef.current.style.height = '64px';
+    if (inputTextareaRef.current) inputTextareaRef.current.style.height = '64px';
   };
 
   const formatFileSize = (bytes: number) => {
@@ -701,7 +726,21 @@ function NewTask() {
           );
         })}
 
-        {/* Pending User Message */}
+        {/* Pending Instruction Bubble (shown immediately on "Send to AI" click) */}
+        {pendingInstruction && (
+          <div className="flex gap-4 flex-row-reverse animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-8 h-8 rounded-full bg-pp-bg border border-pp-border flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-pp-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div className="bg-pp-accent rounded-2xl p-4 max-w-2xl shadow-sm rounded-tr-sm text-pp-bg font-medium opacity-70">
+              <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{pendingInstruction}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Chat Message Bubble */}
         {pendingChatMessage && (
           <div className="flex gap-4 flex-row-reverse animate-in fade-in slide-in-from-bottom-2">
             <div className="w-8 h-8 rounded-full bg-pp-bg border border-pp-border flex items-center justify-center shrink-0">
@@ -725,9 +764,12 @@ function NewTask() {
             </div>
             <div className="max-w-2xl w-full">
               <div className="bg-pp-surface border border-pp-border rounded-2xl rounded-tl-sm p-4 text-pp-text shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-pp-text-muted">Waiting for AI response...</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 border-2 border-pp-accent border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-pp-text-muted">Scanning your prompt for sensitive data before sending to AI provider...</span>
+                  </div>
+                  <p className="text-xs text-pp-text-muted/60 pl-7">Your message is being anonymized in real-time. No raw PII will leave your environment.</p>
                 </div>
               </div>
             </div>
@@ -744,10 +786,12 @@ function NewTask() {
         {step === 'input' && !selectedFile ? (
            <div className="relative">
              <textarea
+               ref={inputTextareaRef}
                value={inputText}
-               onChange={(e) => setInputText(e.target.value)}
+               onChange={(e) => { setInputText(e.target.value); autoResize(inputTextareaRef.current); }}
                placeholder="Type text to anonymize..."
-               className="w-full bg-pp-surface border border-pp-border rounded-xl pl-5 pr-24 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors h-16 shadow-inner leading-tight"
+               className="w-full bg-pp-surface border border-pp-border rounded-xl pl-5 pr-24 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors shadow-inner leading-tight overflow-hidden"
+               style={{ height: '64px' }}
                onKeyDown={(e) => {
                  if (e.key === 'Enter' && !e.shiftKey) {
                    e.preventDefault();
@@ -818,11 +862,13 @@ function NewTask() {
         ) : step === 'done' ? (
             <div className="relative">
               <textarea
+                ref={chatTextareaRef}
                 value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
+                onChange={(e) => { setChatInput(e.target.value); autoResize(chatTextareaRef.current); }}
                 disabled={sendChatMutation.isPending || taskStatus === 'processing'}
                 placeholder="Write another message in the same context to continue the discussion..."
-                className="w-full bg-pp-surface border border-pp-border rounded-xl pl-5 pr-16 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors disabled:opacity-50 h-16 shadow-inner leading-tight"
+                className="w-full bg-pp-surface border border-pp-border rounded-xl pl-5 pr-16 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors disabled:opacity-50 shadow-inner leading-tight overflow-hidden"
+                style={{ height: '64px' }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();

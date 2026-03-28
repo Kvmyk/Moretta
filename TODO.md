@@ -29,10 +29,10 @@
   - 
 ## UI/UX Enhancements
 
-- [ ] **1. Improve Deep Scan feedback**
+- [x] **1. Improve Deep Scan feedback**
   - Add a "Deep scan in progress (message)..." bubble or indicator to inform the user that their prompt (which is send to provider after the local deep scan) is being scanned for PII before being sent to the AI provider.
-- [ ] **2. Chat Interface Scaling**
+- [x] **2. Chat Interface Scaling**
   - Implement auto-scaling for the chat input and message containers to handle varying message lengths and keep the input bar visible at the bottom.
-- [ ] **3. Fix Message Display Delay**
+- [x] **3. Fix Message Display Delay**
   - Ensure the user's message appears immediately in the chat thread, even while the PII scan/processing is running in the background.
 
