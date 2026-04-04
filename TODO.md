@@ -10,6 +10,16 @@
   - The notification should direct the administrator to a documentation page or provide instructions on how to manually update safely (e.g., `git pull && docker compose pull && docker compose up -d`).
   - Create a lightweight `update.sh` / `update.bat` script in the repository to make the process a 1-click execution for the administrator.
 
+- [ ] **Chat History Preservation**
+  - Implement logic to store chat sessions (user prompts, AI responses, and metadata) persistently in the database.
+  - Add UI functionality to fetch, view, and manage past conversations.
+
+- [ ] **Database Migration Analysis (SQLite3 vs PostgreSQL)**
+  - **Analysis:** Currently, SQLite3 provides a great, lightweight, zero-configuration setup perfect for local or small-team deployments. However, as an AI Gateway handling potentially simultaneous requests, SQLite may face database locking and concurrency bottlenecks.
+  - **Pros of PostgreSQL:** Superior handling of concurrent connections, better data integrity, and advanced JSON capabilities which could be very useful for storing unstructured chat history and PII logs.
+  - **Cons of PostgreSQL:** Increases deployment complexity and resource consumption (requires a dedicated `db` container in Docker Compose), deviating from a simple "1-click" setup.
+  - **Conclusion:** If Moretta is intended for broader, multi-user enterprise usage, migrating to PostgreSQL is a very **good idea** and highly recommended. If the priority is keeping it as a lightweight edge tool, it's better to stick with SQLite3 or use an ORM (like SQLAlchemy/Tortoise) to support both based on user configuration.
+
 ## CI/CD Pipeline (GitHub Actions)
 
 - [ ] **1. Standard CI / Tests (Priority)**
