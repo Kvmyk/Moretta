@@ -247,7 +247,8 @@
             <h3>2. Configure .env</h3>
             <p>Edit the <code>.env</code> file and set the following essential variables:</p>
             <ul>
-                <li><code>VAULT_ENCRYPTION_KEY</code>: A 32-64 hex character string to encrypt the local vault.</li>
+                <li><code>DATABASE_URL</code>: PostgreSQL DSN used by the backend (<code>postgresql://moretta:moretta@postgres:5432/moretta</code> by default).</li>
+                <li><code>VAULT_ENCRYPTION_KEY</code>: App-level encryption key for vault payloads and stored blobs.</li>
                 <li><code>ANTHROPIC_API_KEY</code> / <code>OPENAI_API_KEY</code> / <code>GOOGLE_AI_API_KEY</code> / <code>OPENROUTER_API_KEY</code>: At least one external AI provider key (unless using only local Ollama).</li>
             </ul>
         </section>
@@ -320,6 +321,21 @@
                         <td>Internal endpoint for Ollama container.</td>
                     </tr>
                     <tr>
+                        <td><code>DATABASE_BACKEND</code></td>
+                        <td>postgres</td>
+                        <td>Storage backend (<code>postgres</code> or <code>sqlite</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><code>DATABASE_URL</code></td>
+                        <td>postgresql://moretta:moretta@postgres:5432/moretta</td>
+                        <td>Main database DSN used by backend storage and vault.</td>
+                    </tr>
+                    <tr>
+                        <td><code>VAULT_ENCRYPTION_KEY</code></td>
+                        <td></td>
+                        <td>App-level encryption key for vault payloads and stored blobs.</td>
+                    </tr>
+                    <tr>
                         <td><code>DEFAULT_PROVIDER</code></td>
                         <td>claude</td>
                         <td>Main AI engine (claude, openai, gemini, openrouter, ollama).</td>
@@ -331,6 +347,7 @@
                     </tr>
                 </tbody>
             </table>
+            <p>If you already have legacy <code>data/store.db</code> and <code>data/vault.db</code> files, migrate them with <code>python backend/scripts/migrate_sqlite_to_postgres.py --store-db data/store.db --vault-db data/vault.db --database-url postgresql://moretta:moretta@localhost:5432/moretta --encryption-key &lt;your-key&gt;</code>.</p>
         </section>
 
         <section id="troubleshooting">

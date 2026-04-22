@@ -1,96 +1,97 @@
 """
-Moretta — Persistent session store.
-Drop-in replacement for in-memory dicts, backed by SQLite + disk files.
-Data survives process restarts.
+Moretta - Persistent session store.
+Supports PostgreSQL for runtime storage and SQLite for local fallback/tests.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
-import sqlite3
 import threading
-import hashlib
-import base64
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from cryptography.fernet import Fernet
+from db import connect, normalize_backend
+from storage_crypto import InvalidToken, build_fernet, decrypt_bytes, encrypt_bytes
 
 logger = logging.getLogger("moretta.store")
 
 
 class PersistentStore:
     """
-    Dict-like store backed by SQLite for metadata and disk for binary blobs.
-    Keeps an in-memory cache for fast reads, syncs writes to disk.
-
-    Usage:
-        store = PersistentStore(db_path, "files", blob_dir=Path("/app/data/blobs"))
-        store.initialize()
-        store["abc-123"] = {"filename": "doc.docx", "original_bytes": b"...", ...}
-        data = store["abc-123"]
+    Dict-like store backed by PostgreSQL or SQLite.
+    Keeps an in-memory cache for fast reads and persists every write.
     """
 
-    BLOB_FIELDS = {"original_bytes"}  # Fields stored as files, not JSON
+    BLOB_FIELDS = {"original_bytes"}
 
-    def __init__(self, db_path: Path, table: str, blob_dir: Path | None = None, encryption_key: str = "") -> None:
-        self._db_path = db_path
+    def __init__(
+        self,
+        table: str,
+        *,
+        database_backend: str,
+        database_url: str | None = None,
+        sqlite_path: Path | None = None,
+        encryption_key: str = "",
+    ) -> None:
         self._table = table
-        self._blob_dir = blob_dir
+        self._database_backend = normalize_backend(database_backend)
+        self._database_url = database_url
+        self._sqlite_path = sqlite_path
         self._cache: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-        
-        self._fernet = None
-        if encryption_key:
-            # Derive a 32-urlsafe-base64 key required by Fernet using SHA-256
-            key32 = base64.urlsafe_b64encode(hashlib.sha256(encryption_key.encode()).digest())
-            self._fernet = Fernet(key32)
+        self._fernet = build_fernet(encryption_key)
+
+    def _connect(self):
+        return connect(
+            database_backend=self._database_backend,
+            database_url=self._database_url,
+            sqlite_path=self._sqlite_path,
+        )
 
     def initialize(self) -> None:
         """Create table if needed and load existing data into memory."""
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        if self._blob_dir:
-            self._blob_dir.mkdir(parents=True, exist_ok=True)
-
-        with sqlite3.connect(self._db_path) as conn:
-            conn.execute(f"""
+        with self._connect() as conn:
+            conn.execute(
+                f"""
                 CREATE TABLE IF NOT EXISTS {self._table} (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT,
+                    blob_data TEXT NOT NULL DEFAULT '{{}}'
                 )
-            """)
-
+                """
+            )
         self._load_from_db()
-        logger.info(f"Store '{self._table}' loaded: {len(self._cache)} entries from {self._db_path}")
+        logger.info(
+            "Store '%s' loaded: %s entries using %s",
+            self._table,
+            len(self._cache),
+            self._database_backend,
+        )
 
     def _load_from_db(self) -> None:
-        """Load all entries from SQLite into the in-memory cache."""
-        with sqlite3.connect(self._db_path) as conn:
-            rows = conn.execute(f"SELECT key, value FROM {self._table}").fetchall()
+        """Load all entries from the database into the in-memory cache."""
+        self._cache = {}
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT key, value, blob_data FROM {self._table}"
+            ).fetchall()
 
-        for key, value_json in rows:
+        for key, value_json, blob_json in rows:
             try:
                 data = json.loads(value_json)
-                # Restore blob data from disk
-                if self._blob_dir:
-                    for field in self.BLOB_FIELDS:
-                        blob_path = self._blob_dir / f"{key}.{field}"
-                        if blob_path.exists():
-                            blob_data = blob_path.read_bytes()
-                            if self._fernet:
-                                try:
-                                    blob_data = self._fernet.decrypt(blob_data)
-                                except Exception as exc:
-                                    logger.error(f"Failed to decrypt blob {blob_path}: {exc}")
-                                    continue
-                            data[field] = blob_data
+                for field, encoded_blob in json.loads(blob_json or "{}").items():
+                    blob_data = base64.b64decode(encoded_blob.encode("ascii"))
+                    try:
+                        data[field] = decrypt_bytes(blob_data, self._fernet)
+                    except InvalidToken as exc:
+                        logger.error("Failed to decrypt blob '%s.%s': %s", key, field, exc)
                 self._cache[key] = data
-            except (json.JSONDecodeError, Exception) as exc:
-                logger.warning(f"Skipping corrupt entry '{key}' in '{self._table}': {exc}")
-
-    # ── Dict-like interface ────────────────────────────────────────
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                logger.warning("Skipping corrupt entry '%s' in '%s': %s", key, self._table, exc)
 
     def __getitem__(self, key: str) -> dict[str, Any]:
         return self._cache[key]
@@ -103,13 +104,9 @@ class PersistentStore:
     def __delitem__(self, key: str) -> None:
         with self._lock:
             self._cache.pop(key, None)
-            with sqlite3.connect(self._db_path) as conn:
-                conn.execute(f"DELETE FROM {self._table} WHERE key = ?", (key,))
-            # Remove blob files
-            if self._blob_dir:
-                for field in self.BLOB_FIELDS:
-                    blob_path = self._blob_dir / f"{key}.{field}"
-                    blob_path.unlink(missing_ok=True)
+            placeholder = "%s" if self._database_backend == "postgres" else "?"
+            with self._connect() as conn:
+                conn.execute(f"DELETE FROM {self._table} WHERE key = {placeholder}", (key,))
 
     def __contains__(self, key: str) -> bool:
         return key in self._cache
@@ -123,32 +120,45 @@ class PersistentStore:
     def __len__(self) -> int:
         return len(self._cache)
 
-    # ── Persistence ────────────────────────────────────────────────
-
     def _persist(self, key: str, value: dict[str, Any]) -> None:
-        """Write metadata to SQLite and blobs to disk."""
-        data = dict(value)  # shallow copy
+        """Write the current value to the configured database backend."""
+        data = dict(value)
         created_at = data.get("uploaded_at") or data.get("created_at") or ""
 
-        # Extract blob fields and save to disk
-        if self._blob_dir:
-            for field in self.BLOB_FIELDS:
-                blob_data = data.pop(field, None)
-                if blob_data and isinstance(blob_data, (bytes, bytearray)):
-                    blob_path = self._blob_dir / f"{key}.{field}"
-                    if self._fernet:
-                        blob_data = self._fernet.encrypt(bytes(blob_data))
-                    blob_path.write_bytes(blob_data)
+        blobs: dict[str, str] = {}
+        for field in self.BLOB_FIELDS:
+            blob_data = data.pop(field, None)
+            if isinstance(blob_data, (bytes, bytearray)):
+                encrypted_blob = encrypt_bytes(bytes(blob_data), self._fernet)
+                blobs[field] = base64.b64encode(encrypted_blob).decode("ascii")
 
         serialized = json.dumps(data, default=str, ensure_ascii=False)
-        with sqlite3.connect(self._db_path) as conn:
-            conn.execute(
-                f"INSERT OR REPLACE INTO {self._table} (key, value, created_at) VALUES (?, ?, ?)",
-                (key, serialized, created_at),
-            )
+        blob_serialized = json.dumps(blobs)
+
+        with self._connect() as conn:
+            if self._database_backend == "postgres":
+                conn.execute(
+                    f"""
+                    INSERT INTO {self._table} (key, value, created_at, blob_data)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (key) DO UPDATE
+                    SET value = EXCLUDED.value,
+                        created_at = EXCLUDED.created_at,
+                        blob_data = EXCLUDED.blob_data
+                    """,
+                    (key, serialized, created_at, blob_serialized),
+                )
+            else:
+                conn.execute(
+                    f"""
+                    INSERT OR REPLACE INTO {self._table} (key, value, created_at, blob_data)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (key, serialized, created_at, blob_serialized),
+                )
 
     def update_field(self, key: str, field: str, value: Any) -> None:
-        """Update a single field without rewriting the entire entry."""
+        """Update a single field without rewriting the in-memory object manually."""
         if key not in self._cache:
             raise KeyError(key)
         with self._lock:
@@ -156,31 +166,25 @@ class PersistentStore:
             self._persist(key, self._cache[key])
 
     def persist(self, key: str) -> None:
-        """Explicitly flush in-memory mutations for a key to disk.
-
-        Call this after directly mutating nested values, e.g.:
-            store[key]["status"] = "completed"
-            store.persist(key)
-        """
+        """Explicitly flush in-memory mutations for a key to the database."""
         if key in self._cache:
             with self._lock:
                 self._persist(key, self._cache[key])
 
     def cleanup_older_than(self, seconds: int, timestamp_field: str = "uploaded_at") -> list[str]:
         """Remove entries older than `seconds`. Returns list of removed keys."""
-        from datetime import datetime, timezone
-
         now = datetime.now(timezone.utc)
         expired = []
         for key, data in list(self._cache.items()):
             ts = data.get(timestamp_field)
-            if ts:
-                try:
-                    age = (now - datetime.fromisoformat(ts)).total_seconds()
-                    if age > seconds:
-                        expired.append(key)
-                except (ValueError, TypeError):
-                    pass
+            if not ts:
+                continue
+            try:
+                age = (now - datetime.fromisoformat(ts)).total_seconds()
+            except (ValueError, TypeError):
+                continue
+            if age > seconds:
+                expired.append(key)
 
         for key in expired:
             del self[key]

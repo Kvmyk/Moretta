@@ -23,6 +23,8 @@ google-generativeai>=0.8.0
 python-dotenv>=1.0.0
 pydantic-settings>=2.0.0
 PyJWT[crypto]>=2.9.0
+cryptography>=43.0.0
+psycopg[binary]>=3.2.0
 
 # Testing
 pytest>=8.0.0

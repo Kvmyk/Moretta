@@ -5,7 +5,6 @@ All settings are loaded from environment variables with sensible defaults.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from functools import lru_cache
 
@@ -21,6 +20,8 @@ class Settings(BaseSettings):
 
     # ── Vault ─────────────────────────────────────────────────────
     vault_encryption_key: str = ""
+    database_backend: str = "postgres"
+    database_url: str = "postgresql://moretta:moretta@postgres:5432/moretta"
 
     # ── External AI Providers ─────────────────────────────────────
     anthropic_api_key: str = ""
@@ -57,10 +58,6 @@ class Settings(BaseSettings):
     @property
     def store_db_path(self) -> Path:
         return Path(self.data_dir) / "store.db"
-
-    @property
-    def blobs_dir(self) -> Path:
-        return Path(self.data_dir) / "blobs"
 
     class Config:
         env_file = ".env"

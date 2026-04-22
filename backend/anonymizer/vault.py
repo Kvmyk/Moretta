@@ -1,125 +1,130 @@
 """
-Moretta — Encrypted PII Vault.
-Stores session-based token ↔ original PII mappings in encrypted SQLite.
+Moretta - Encrypted PII vault.
+Stores session token maps in PostgreSQL or SQLite with app-level encryption.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import logging
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+
+from db import connect, normalize_backend
+from storage_crypto import InvalidToken, build_fernet, decrypt_text, encrypt_text
 
 logger = logging.getLogger("moretta.vault")
 
 
 class Vault:
-    """Encrypted SQLite vault for PII token mappings."""
+    """Encrypted vault for PII token mappings."""
 
-    def __init__(self, db_path: Path, encryption_key: str = "") -> None:
-        self._db_path = db_path
-        self._encryption_key = encryption_key
+    def __init__(
+        self,
+        *,
+        database_backend: str,
+        database_url: str | None = None,
+        sqlite_path: Path | None = None,
+        encryption_key: str = "",
+    ) -> None:
+        self._database_backend = normalize_backend(database_backend)
+        self._database_url = database_url
+        self._sqlite_path = sqlite_path
+        self._fernet = build_fernet(encryption_key)
 
-    def _connect(self) -> sqlite3.Connection:
-        """Create a connection to the SQLite database."""
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self._db_path))
-
-        # Apply encryption if key is provided
-        if self._encryption_key:
-            # Validate key format: only hex characters, 32-64 chars long
-            if not re.fullmatch(r"[0-9a-fA-F]{32,64}", self._encryption_key):
-                logger.error("Vault encryption key must be 32-64 hex characters. Running unencrypted.")
-            else:
-                try:
-                    conn.execute("PRAGMA key = ?", (self._encryption_key,))
-                    logger.debug("Vault encryption enabled")
-                except Exception as exc:
-                    logger.warning(f"SQLite encryption not available: {exc}. Running unencrypted.")
-
-        return conn
+    def _connect(self):
+        return connect(
+            database_backend=self._database_backend,
+            database_url=self._database_url,
+            sqlite_path=self._sqlite_path,
+        )
 
     def initialize(self) -> None:
         """Create the vault table if it doesn't exist."""
-        conn = self._connect()
-        try:
-            conn.execute("""
+        with self._connect() as conn:
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS pii_sessions (
                     session_id TEXT PRIMARY KEY,
                     token_map TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     expires_at TEXT
                 )
-            """)
-            conn.commit()
-            logger.info(f"Vault initialized at {self._db_path}")
-        finally:
-            conn.close()
+                """
+            )
+        logger.info("Vault initialized using %s", self._database_backend)
 
     def store_session(self, session_id: str, token_map: dict[str, str]) -> None:
         """Store a token mapping for a session."""
-        conn = self._connect()
-        try:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO pii_sessions (session_id, token_map, created_at)
-                VALUES (?, ?, ?)
-                """,
-                (
-                    session_id,
-                    json.dumps(token_map, ensure_ascii=False),
-                    datetime.now(timezone.utc).isoformat(),
-                ),
-            )
-            conn.commit()
-            logger.info(f"Stored {len(token_map)} tokens for session {session_id[:8]}...")
-        finally:
-            conn.close()
+        token_payload = json.dumps(token_map, ensure_ascii=False)
+        if self._fernet:
+            token_payload = encrypt_text(token_payload, self._fernet)
+
+        created_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            if self._database_backend == "postgres":
+                conn.execute(
+                    """
+                    INSERT INTO pii_sessions (session_id, token_map, created_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (session_id) DO UPDATE
+                    SET token_map = EXCLUDED.token_map,
+                        created_at = EXCLUDED.created_at
+                    """,
+                    (session_id, token_payload, created_at),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pii_sessions (session_id, token_map, created_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (session_id, token_payload, created_at),
+                )
+        logger.info("Stored %s tokens for session %s...", len(token_map), session_id[:8])
 
     def get_session(self, session_id: str) -> dict[str, str]:
         """Retrieve the token mapping for a session."""
-        conn = self._connect()
-        try:
-            cursor = conn.execute(
-                "SELECT token_map FROM pii_sessions WHERE session_id = ?",
+        placeholder = "%s" if self._database_backend == "postgres" else "?"
+        with self._connect() as conn:
+            row = conn.execute(
+                f"SELECT token_map FROM pii_sessions WHERE session_id = {placeholder}",
                 (session_id,),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                logger.warning(f"Session {session_id[:8]}... not found in vault")
+            ).fetchone()
+
+        if row is None:
+            logger.warning("Session %s... not found in vault", session_id[:8])
+            return {}
+
+        token_payload = row[0]
+        if self._fernet:
+            try:
+                token_payload = decrypt_text(token_payload, self._fernet)
+            except (InvalidToken, ValueError) as exc:
+                logger.error("Failed to decrypt vault session %s...: %s", session_id[:8], exc)
                 return {}
-            return json.loads(row[0])
-        finally:
-            conn.close()
+        return json.loads(token_payload)
 
     def delete_session(self, session_id: str) -> None:
-        """Delete a session's token mapping (cleanup after task completion)."""
-        conn = self._connect()
-        try:
+        """Delete a session's token mapping."""
+        placeholder = "%s" if self._database_backend == "postgres" else "?"
+        with self._connect() as conn:
             conn.execute(
-                "DELETE FROM pii_sessions WHERE session_id = ?",
+                f"DELETE FROM pii_sessions WHERE session_id = {placeholder}",
                 (session_id,),
             )
-            conn.commit()
-            logger.info(f"Deleted session {session_id[:8]}... from vault")
-        finally:
-            conn.close()
+        logger.info("Deleted session %s... from vault", session_id[:8])
 
     def cleanup_expired(self) -> int:
         """Remove expired sessions. Returns count of deleted sessions."""
-        conn = self._connect()
-        try:
+        now = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self._database_backend == "postgres" else "?"
+        with self._connect() as conn:
             cursor = conn.execute(
-                "DELETE FROM pii_sessions WHERE expires_at IS NOT NULL AND expires_at < ?",
-                (datetime.now(timezone.utc).isoformat(),),
+                f"DELETE FROM pii_sessions WHERE expires_at IS NOT NULL AND expires_at < {placeholder}",
+                (now,),
             )
-            conn.commit()
-            count = cursor.rowcount
-            if count > 0:
-                logger.info(f"Cleaned up {count} expired vault sessions")
-            return count
-        finally:
-            conn.close()
+        count = cursor.rowcount
+        if count > 0:
+            logger.info("Cleaned up %s expired vault sessions", count)
+        return count

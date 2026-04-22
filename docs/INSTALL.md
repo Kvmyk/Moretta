@@ -17,7 +17,8 @@ cp .env.example .env
 
 ### 2. Configure .env
 Edit the `.env` file and set the following essential variables:
-- `VAULT_ENCRYPTION_KEY`: A 32-64 hex character string to encrypt the local vault.
+- `DATABASE_URL`: PostgreSQL DSN used by the backend (`postgresql://moretta:moretta@postgres:5432/moretta` by default).
+- `VAULT_ENCRYPTION_KEY`: App-level encryption key for vault payloads and stored blobs.
 - `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_AI_API_KEY` / `OPENROUTER_API_KEY`: At least one external AI provider key (unless using only local Ollama).
 
 ### 3. Launch

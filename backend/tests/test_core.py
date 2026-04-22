@@ -19,7 +19,7 @@ class TestPersistentStore:
     def test_store_basic_crud(self, tmp_path: Path):
         from store import PersistentStore
 
-        store = PersistentStore(tmp_path / "test.db", "items")
+        store = PersistentStore("items", database_backend="sqlite", sqlite_path=tmp_path / "test.db")
         store.initialize()
 
         store["key1"] = {"name": "test", "value": 42}
@@ -37,13 +37,13 @@ class TestPersistentStore:
         db_path = tmp_path / "persist.db"
 
         # Write with first instance
-        store1 = PersistentStore(db_path, "data")
+        store1 = PersistentStore("data", database_backend="sqlite", sqlite_path=db_path)
         store1.initialize()
         store1["session1"] = {"status": "active", "count": 5}
         store1["session2"] = {"status": "done", "count": 10}
 
         # Read with new instance (simulates restart)
-        store2 = PersistentStore(db_path, "data")
+        store2 = PersistentStore("data", database_backend="sqlite", sqlite_path=db_path)
         store2.initialize()
         assert "session1" in store2
         assert store2["session1"]["status"] == "active"
@@ -53,21 +53,18 @@ class TestPersistentStore:
     def test_store_blob_persistence(self, tmp_path: Path):
         from store import PersistentStore
 
-        blob_dir = tmp_path / "blobs"
-        store = PersistentStore(tmp_path / "blob.db", "files", blob_dir=blob_dir)
+        db_path = tmp_path / "blob.db"
+        store = PersistentStore("files", database_backend="sqlite", sqlite_path=db_path)
         store.initialize()
 
         test_bytes = b"Hello, binary world! \x00\xff\xfe"
         store["file1"] = {"filename": "test.docx", "original_bytes": test_bytes}
 
-        # Verify blob is on disk
-        assert (blob_dir / "file1.original_bytes").exists()
-
         # Verify blob is in memory
         assert store["file1"]["original_bytes"] == test_bytes
 
         # Verify blob survives reload
-        store2 = PersistentStore(tmp_path / "blob.db", "files", blob_dir=blob_dir)
+        store2 = PersistentStore("files", database_backend="sqlite", sqlite_path=db_path)
         store2.initialize()
         assert store2["file1"]["original_bytes"] == test_bytes
 
@@ -75,7 +72,7 @@ class TestPersistentStore:
         from store import PersistentStore
 
         db_path = tmp_path / "mutate.db"
-        store = PersistentStore(db_path, "tasks")
+        store = PersistentStore("tasks", database_backend="sqlite", sqlite_path=db_path)
         store.initialize()
 
         store["task1"] = {"status": "processing", "messages": []}
@@ -84,7 +81,7 @@ class TestPersistentStore:
         store.persist("task1")
 
         # Reload and verify
-        store2 = PersistentStore(db_path, "tasks")
+        store2 = PersistentStore("tasks", database_backend="sqlite", sqlite_path=db_path)
         store2.initialize()
         assert store2["task1"]["status"] == "completed"
         assert len(store2["task1"]["messages"]) == 1
@@ -93,7 +90,7 @@ class TestPersistentStore:
         from store import PersistentStore
         from datetime import datetime, timezone, timedelta
 
-        store = PersistentStore(tmp_path / "ttl.db", "sessions")
+        store = PersistentStore("sessions", database_backend="sqlite", sqlite_path=tmp_path / "ttl.db")
         store.initialize()
 
         old_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
@@ -106,6 +103,41 @@ class TestPersistentStore:
         assert "old" in removed
         assert "old" not in store
         assert "new" in store
+
+
+class TestVault:
+    """Test that the encrypted vault persists token maps correctly."""
+
+    def test_vault_store_and_load(self, tmp_path: Path):
+        from anonymizer.vault import Vault
+
+        vault = Vault(
+            database_backend="sqlite",
+            sqlite_path=tmp_path / "vault.db",
+            encryption_key="test-secret",
+        )
+        vault.initialize()
+
+        token_map = {"<UUID_1>": "Jan Kowalski", "<UUID_2>": "92010212345"}
+        vault.store_session("session-1", token_map)
+
+        restored = vault.get_session("session-1")
+        assert restored == token_map
+
+    def test_vault_delete_session(self, tmp_path: Path):
+        from anonymizer.vault import Vault
+
+        vault = Vault(
+            database_backend="sqlite",
+            sqlite_path=tmp_path / "vault.db",
+            encryption_key="test-secret",
+        )
+        vault.initialize()
+        vault.store_session("session-1", {"<UUID_1>": "Jan Kowalski"})
+
+        vault.delete_session("session-1")
+
+        assert vault.get_session("session-1") == {}
 
 
 # ── API Tests ──────────────────────────────────────────────────────

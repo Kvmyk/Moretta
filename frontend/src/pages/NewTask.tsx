@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import PiiDetectionCard from '../auth/components/PiiDetectionCard';
 import ProviderSelector from '../auth/components/ProviderSelector';
@@ -41,10 +42,38 @@ interface PreviewResult {
 
 interface TaskResult {
   task_id: string;
+  conversation_id?: string;
   status: string;
 }
 
+interface ConversationMessage {
+  role: string;
+  content: string;
+  provider?: string;
+  model?: string;
+  created_at?: string;
+}
+
+interface ConversationDetail {
+  conversation_id: string;
+  task_id: string;
+  title: string;
+  filename: string;
+  file_id?: string;
+  provider: string;
+  model: string;
+  status: string;
+  messages: ConversationMessage[];
+  has_solution?: boolean;
+  result_preview?: any;
+  created_at?: string;
+  last_activity_at?: string;
+  context_expired?: boolean;
+}
+
 function NewTask() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversationId = searchParams.get('conversation');
   const [fileId, setFileId] = useState<string | null>(null);
   const [filename, setFilename] = useState<string>('');
   
@@ -84,6 +113,7 @@ function NewTask() {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     const allowed = ['.docx', '.xlsx', '.eml', '.msg', '.txt'];
     if (allowed.includes(ext)) {
+      setSearchParams({}, { replace: true });
       setSelectedFile(file);
       setStep('input');
       setFileId(null);
@@ -93,7 +123,7 @@ function NewTask() {
       setInstruction('');
       setInputText('');
     }
-  }, []);
+  }, [setSearchParams]);
 
   const onDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -187,8 +217,18 @@ function NewTask() {
     },
   });
 
+  const conversationQuery = useQuery<ConversationDetail>({
+    queryKey: ['conversation', conversationId],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/conversations/${conversationId}`);
+      if (!res.ok) throw new Error('Conversation fetch failed');
+      return res.json();
+    },
+    enabled: !!conversationId,
+  });
+
   // Fetch final result returning chat messages
-  const resultQuery = useQuery<{ task_id: string; status: string; filename: string; messages: Array<{role: string, content: string}>; has_solution?: boolean; result_preview?: any }>({
+  const resultQuery = useQuery<ConversationDetail>({
     queryKey: ['result', taskId],
     queryFn: async () => {
       const res = await apiFetch(`/api/task/${taskId}/result`);
@@ -198,13 +238,18 @@ function NewTask() {
     enabled: !!taskId && taskStatus === 'completed',
   });
 
+  const activeConversation = conversationId
+    ? (taskStatus === 'completed' ? (resultQuery.data ?? conversationQuery.data) : conversationQuery.data)
+    : (taskStatus === 'completed' ? resultQuery.data : undefined);
+  const conversationContextExpired = activeConversation?.context_expired === true;
+
   // Chat mutation for multi-turn
   const sendChatMutation = useMutation({
     mutationFn: async (chatInstruction: string) => {
       const res = await apiFetch(`/api/task/${taskId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction: chatInstruction }),
+        body: JSON.stringify({ instruction: chatInstruction, provider, model }),
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -231,7 +276,7 @@ function NewTask() {
   // Selective scrolling - only on step change or new message
   useEffect(() => {
     scrollToBottom();
-  }, [step, resultQuery.data?.messages.length, pendingChatMessage]);
+  }, [step, activeConversation?.messages.length, pendingChatMessage]);
 
   // Create task
   const createTaskMutation = useMutation({
@@ -263,6 +308,7 @@ function NewTask() {
       setTaskId(data.task_id);
       setTaskStatus('processing');
       setStep('processing');
+      setSearchParams({ conversation: data.conversation_id || data.task_id }, { replace: true });
       pollTaskStatus(data.task_id);
     },
     onError: (error: Error) => {
@@ -298,6 +344,31 @@ function NewTask() {
     };
     poll();
   }, []);
+
+  useEffect(() => {
+    if (!conversationQuery.data) return;
+
+    const conversation = conversationQuery.data;
+    setSelectedFile(null);
+    setFileId(conversation.file_id ?? null);
+    setFilename(conversation.filename);
+    setTaskId(conversation.task_id);
+    setTaskStatus(conversation.status);
+    setProvider(conversation.provider || 'claude');
+    setModel(conversation.model || '');
+    setInstruction('');
+    setInputText('');
+    setSecurityError(null);
+    setPendingInstruction(null);
+    setPendingChatMessage(null);
+
+    if (conversation.status === 'processing') {
+      setStep('processing');
+      pollTaskStatus(conversation.task_id);
+    } else {
+      setStep('done');
+    }
+  }, [conversationQuery.data, pollTaskStatus]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -336,6 +407,7 @@ function NewTask() {
   };
 
   const handleReset = () => {
+    setSearchParams({}, { replace: true });
     setFileId(null);
     setFilename('');
     setStep('input');
@@ -609,12 +681,12 @@ function NewTask() {
         )}
 
         {/* Chat Thread Messages */}
-        {resultQuery.data?.messages.map((msg, idx) => {
-          const hasSolution = resultQuery.data?.has_solution;
-          const resultPreview = resultQuery.data?.result_preview;
+        {activeConversation?.messages.map((msg, idx) => {
+          const hasSolution = activeConversation?.has_solution;
+          const resultPreview = activeConversation?.result_preview;
           // Show result card for the latest assistant message when a solution exists
           const isLastAssistant = msg.role === 'assistant' && 
-            idx === resultQuery.data!.messages.length - 1 && 
+            idx === activeConversation.messages.length - 1 && 
             hasSolution;
 
           return (
@@ -635,6 +707,14 @@ function NewTask() {
               <div className={`rounded-2xl p-4 max-w-2xl shadow-sm ${
                 msg.role === 'user' ? 'bg-pp-accent rounded-tr-sm text-pp-bg font-medium' : 'bg-pp-surface border border-pp-border rounded-tl-sm text-pp-text'
               }`}>
+                {(msg.provider || msg.model) && (
+                  <div className={`flex gap-2 flex-wrap mb-3 text-[10px] uppercase tracking-widest ${
+                    msg.role === 'user' ? 'text-pp-bg/70' : 'text-pp-text-muted'
+                  }`}>
+                    {msg.provider && <span>{msg.provider}</span>}
+                    {msg.model && <span className="font-mono normal-case tracking-normal text-[11px]">{msg.model}</span>}
+                  </div>
+                )}
                 {isLastAssistant ? (
                   <div className="space-y-4">
                     {/* Chat message from AI */}
@@ -776,6 +856,22 @@ function NewTask() {
            </div>
         )}
 
+        {conversationContextExpired && (
+          <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-8 h-8 rounded-full bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-7.938 4h15.876c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L2.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl rounded-tl-sm p-4 max-w-2xl">
+              <p className="text-sm text-yellow-100 leading-relaxed">
+                This conversation is still visible in history, but its secure processing context expired after inactivity.
+                Start a new conversation to continue sending content to a model safely.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Dummy element for auto-scroll */}
         <div ref={chatEndRef} className="h-4" />
       </div>
@@ -865,22 +961,28 @@ function NewTask() {
                 ref={chatTextareaRef}
                 value={chatInput}
                 onChange={(e) => { setChatInput(e.target.value); autoResize(chatTextareaRef.current); }}
-                disabled={sendChatMutation.isPending || taskStatus === 'processing'}
-                placeholder="Write another message in the same context to continue the discussion..."
+                disabled={sendChatMutation.isPending || taskStatus === 'processing' || conversationContextExpired}
+                placeholder={conversationContextExpired
+                  ? 'This conversation context expired. Start a new conversation to continue.'
+                  : 'Write another message in the same context to continue the discussion...'}
                 className="w-full bg-pp-surface border border-pp-border rounded-xl pl-5 pr-16 py-4 text-sm text-white placeholder-pp-text-muted/60 resize-none focus:outline-none focus:border-pp-accent transition-colors disabled:opacity-50 shadow-inner leading-tight overflow-hidden"
                 style={{ height: '64px' }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    if (chatInput.trim()) sendChatMutation.mutate(chatInput);
+                    if (chatInput.trim() && !conversationContextExpired) sendChatMutation.mutate(chatInput);
                   }
                 }}
               />
               
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
                  <button
-                   disabled={!chatInput.trim() || sendChatMutation.isPending || taskStatus === 'processing'}
-                   onClick={() => sendChatMutation.mutate(chatInput)}
+                   disabled={!chatInput.trim() || sendChatMutation.isPending || taskStatus === 'processing' || conversationContextExpired}
+                   onClick={() => {
+                     if (!conversationContextExpired) {
+                       sendChatMutation.mutate(chatInput);
+                     }
+                   }}
                    className="w-8 h-8 bg-pp-accent hover:bg-pp-accent-light text-white rounded-lg flex items-center justify-center transition-all disabled:opacity-50 disabled:bg-pp-border disabled:hover:bg-pp-border"
                  >
                    <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -13,7 +13,7 @@ RUN python -m spacy download pl_core_news_sm
 
 COPY . .
 
-RUN mkdir -p /app/data/logs /app/data/blobs
+RUN mkdir -p /app/data/logs /app/data/uploads
 
 EXPOSE 8000
 

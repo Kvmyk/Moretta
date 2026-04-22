@@ -1,6 +1,24 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: privateproxy-postgres
+    environment:
+      POSTGRES_DB: moretta
+      POSTGRES_USER: moretta
+      POSTGRES_PASSWORD: moretta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moretta -d moretta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - privateproxy-net
+
   backend:
     build:
       context: ./backend
@@ -13,8 +31,12 @@ services:
     volumes:
       - ./data:/app/data
     depends_on:
-      - ollama
-      - keycloak
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      keycloak:
+        condition: service_started
     restart: unless-stopped
     networks:
       - privateproxy-net
@@ -71,6 +93,7 @@ services:
 
 volumes:
   ollama_data:
+  postgres_data:
 
 networks:
   privateproxy-net:

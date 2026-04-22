@@ -35,6 +35,7 @@ from parsers.xlsx_parser import parse_xlsx
 from parsers.email_parser import parse_email
 from rebuilders import rebuild_xlsx, rebuild_docx
 from providers.base import get_provider
+from providers.models_registry import get_default_model
 from audit.audit_log import AuditLogger
 from auth import AuthConfig, AuthError, OIDCValidator
 from store import PersistentStore
@@ -53,7 +54,7 @@ access_logger = logging.getLogger("moretta.access")
 app = FastAPI(
     title="Moretta",
     description="Self-hosted AI proxy with PII anonymization",
-    version="0.7.0",
+    version="0.7.5",
 )
 
 app.add_middleware(
@@ -67,14 +68,25 @@ app.add_middleware(
 # ── State stores (persistent — survive restarts) ───────────────────
 
 file_store = PersistentStore(
-    settings.store_db_path,
     "files",
-    blob_dir=settings.blobs_dir,
-    encryption_key=settings.vault_encryption_key
+    database_backend=settings.database_backend,
+    database_url=settings.database_url,
+    sqlite_path=settings.store_db_path,
+    encryption_key=settings.vault_encryption_key,
 )
-task_store = PersistentStore(settings.store_db_path, "tasks")
+task_store = PersistentStore(
+    "tasks",
+    database_backend=settings.database_backend,
+    database_url=settings.database_url,
+    sqlite_path=settings.store_db_path,
+)
 
-vault = Vault(settings.vault_path, settings.vault_encryption_key)
+vault = Vault(
+    database_backend=settings.database_backend,
+    database_url=settings.database_url,
+    sqlite_path=settings.vault_path,
+    encryption_key=settings.vault_encryption_key,
+)
 audit = AuditLogger(settings.audit_log_path)
 detector = PiiDetector(settings.ollama_url, settings.local_model)
 guard = SecurityGuard(settings.ollama_url, settings.local_model)
@@ -90,11 +102,16 @@ async def _cleanup_expired_sessions():
     while True:
         await asyncio.sleep(600)  # Check every 10 minutes
         expired_files = file_store.cleanup_older_than(SESSION_TTL_SECONDS, "uploaded_at")
-        expired_tasks = task_store.cleanup_older_than(SESSION_TTL_SECONDS, "created_at")
-        for tid in expired_tasks:
+        expired_task_contexts = _expired_task_context_ids(SESSION_TTL_SECONDS)
+        for tid in expired_task_contexts:
             vault.delete_session(tid)
-        if expired_files or expired_tasks:
-            logger.info(f"TTL cleanup: removed {len(expired_files)} files, {len(expired_tasks)} tasks from memory")
+            if tid in task_store:
+                task_store[tid]["context_expired"] = True
+                task_store.persist(tid)
+        if expired_files or expired_task_contexts:
+            logger.info(
+                f"TTL cleanup: removed {len(expired_files)} files and expired {len(expired_task_contexts)} task contexts"
+            )
 
 auth_validator = OIDCValidator(
     AuthConfig(
@@ -135,6 +152,110 @@ def _get_user(request: Request) -> str:
     return "anonymous"
 
 
+def _get_user_identity(request: Request) -> dict[str, str]:
+    """Extract stable user identity fields used for per-user record ownership."""
+    try:
+        payload = getattr(request.state, "user", None)
+        if payload and isinstance(payload, dict):
+            user_id = str(payload.get("sub") or payload.get("preferred_username") or "anonymous")
+            username = str(payload.get("preferred_username") or payload.get("sub") or "anonymous")
+            return {"user_id": user_id, "username": username}
+    except Exception:
+        pass
+    return {"user_id": "anonymous", "username": "anonymous"}
+
+
+def _record_belongs_to_user(record: dict[str, Any], user_identity: dict[str, str]) -> bool:
+    """Check whether a stored record belongs to the authenticated user."""
+    record_user_id = str(record.get("user_id") or "").strip()
+    record_username = str(record.get("username") or record.get("user") or "").strip()
+
+    if record_user_id:
+        return record_user_id == user_identity["user_id"]
+    if record_username:
+        return record_username == user_identity["username"]
+    return user_identity["user_id"] == "anonymous"
+
+
+def _require_owned_file(request: Request, file_id: str) -> dict[str, Any]:
+    info = file_store.get(file_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not _record_belongs_to_user(info, _get_user_identity(request)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return info
+
+
+def _require_owned_task(request: Request, task_id: str) -> dict[str, Any]:
+    task = task_store.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not _record_belongs_to_user(task, _get_user_identity(request)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return task
+
+
+def _resolve_model(provider_name: str, model_id: str | None) -> str:
+    """Return requested model or the provider default when omitted."""
+    requested = (model_id or "").strip()
+    return requested or get_default_model(provider_name)
+
+
+def _new_message(
+    role: str,
+    content: str,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Build a chat turn with metadata so mixed-model conversations stay auditable."""
+    message = {
+        "role": role,
+        "content": content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if provider:
+        message["provider"] = provider
+    if model:
+        message["model"] = model
+    return message
+
+
+def _conversation_title(filename: str, instruction: str) -> str:
+    """Generate a short title for the conversation list."""
+    cleaned_instruction = " ".join(instruction.strip().split())
+    if filename and filename != "text_message.txt":
+        return filename
+    if cleaned_instruction:
+        return cleaned_instruction[:72]
+    return filename or "Untitled conversation"
+
+
+def _conversation_summary(task_id: str, task: dict[str, Any]) -> dict[str, Any]:
+    """Map a task record into conversation list metadata."""
+    messages = task.get("messages", [])
+    latest_message = messages[-1] if messages else {}
+    last_activity_at = task.get("last_activity_at") or task.get("created_at") or ""
+    latest_model = task.get("model") or ""
+    latest_provider = task.get("provider") or ""
+
+    return {
+        "conversation_id": task_id,
+        "task_id": task_id,
+        "title": task.get("title") or _conversation_title(task.get("filename", ""), ""),
+        "filename": task.get("filename", ""),
+        "provider": latest_provider,
+        "model": latest_model,
+        "status": task.get("status", "unknown"),
+        "pii_masked": task.get("pii_masked", 0),
+        "created_at": task.get("created_at", ""),
+        "last_activity_at": last_activity_at,
+        "message_count": len(messages),
+        "last_message_preview": str(latest_message.get("content", ""))[:160],
+        "context_expired": bool(task.get("context_expired")),
+    }
+
+
 def _get_client_ip(request: Request) -> str:
     """Extract real client IP, respecting X-Forwarded-For from reverse proxy."""
     forwarded = request.headers.get("X-Forwarded-For")
@@ -169,6 +290,25 @@ def _sanitize_error(error: str, max_length: int = 200) -> str:
     return sanitized
 
 
+def _expired_task_context_ids(seconds: int) -> list[str]:
+    """Return task ids whose sensitive processing context should expire."""
+    now = datetime.now(timezone.utc)
+    expired: list[str] = []
+    for task_id, task in task_store.items():
+        if task.get("context_expired"):
+            continue
+        ts = task.get("last_activity_at") or task.get("created_at")
+        if not ts:
+            continue
+        try:
+            age = (now - datetime.fromisoformat(ts)).total_seconds()
+        except (ValueError, TypeError):
+            continue
+        if age > seconds:
+            expired.append(task_id)
+    return expired
+
+
 # ── Startup / Shutdown ─────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -180,7 +320,7 @@ async def startup_event() -> None:
     task_store.initialize()
     vault.initialize()
     asyncio.create_task(_cleanup_expired_sessions())
-    logger.info(f"Moretta backend v0.7 started ({len(file_store)} files, {len(task_store)} tasks restored)")
+    logger.info(f"Moretta backend v0.7.5 started ({len(file_store)} files, {len(task_store)} tasks restored)")
 
 
 @app.middleware("http")
@@ -284,6 +424,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), background
     # Detect PII (Stage 1: Presidio, Stage 2: Ollama)
     pii_results = await detector.detect(text)
 
+    user_identity = _get_user_identity(request)
     file_store[file_id] = {
         "path": None,
         "filename": filename,
@@ -295,9 +436,11 @@ async def upload_file(request: Request, file: UploadFile = File(...), background
         "deep_scan_completed": False,
         "size_bytes": len(contents),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_identity["user_id"],
+        "username": user_identity["username"],
     }
 
-    user = _get_user(request)
+    user = user_identity["username"]
     audit.log(
         event="file_uploaded",
         user=user,
@@ -341,6 +484,7 @@ async def process_text(http_request: Request, request: TextInputRequest, backgro
     # Keep text in memory only (do not persist plaintext to uploads).
     file_bytes = text.encode("utf-8")
 
+    user_identity = _get_user_identity(http_request)
     file_store[file_id] = {
         "path": None,
         "filename": filename,
@@ -352,9 +496,11 @@ async def process_text(http_request: Request, request: TextInputRequest, backgro
         "deep_scan_completed": False,
         "size_bytes": len(file_bytes),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_identity["user_id"],
+        "username": user_identity["username"],
     }
 
-    user = _get_user(http_request)
+    user = user_identity["username"]
     audit.log(
         event="text_submitted",
         user=user,
@@ -379,9 +525,7 @@ async def process_text(http_request: Request, request: TextInputRequest, backgro
 @app.get("/api/file/{file_id}/pii")
 async def get_pii(request: Request, file_id: str) -> dict:
     """Return list of detected PII with types and counts."""
-    info = file_store.get(file_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="File not found")
+    info = _require_owned_file(request, file_id)
 
     audit.log(
         event="pii_viewed",
@@ -428,9 +572,7 @@ async def get_pii(request: Request, file_id: str) -> dict:
 @app.get("/api/file/{file_id}/preview")
 async def get_preview(request: Request, file_id: str) -> dict:
     """Return anonymized preview of the file text/structure."""
-    info = file_store.get(file_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="File not found")
+    info = _require_owned_file(request, file_id)
 
     audit.log(
         event="preview_viewed",
@@ -490,8 +632,9 @@ async def create_task(
     instruction = body.get("instruction", "")
     provider_name = body.get("provider", settings.default_provider)
     model_id = body.get("model")  # optional specific model
+    resolved_model = _resolve_model(provider_name, model_id)
 
-    if not file_id or file_id not in file_store:
+    if not file_id:
         raise HTTPException(status_code=404, detail="File not found")
 
     if not instruction.strip():
@@ -510,7 +653,7 @@ async def create_task(
             detail="Polityka Bezpieczeństwa (Security Guard): Instrukcja zawiera chronione dane wrażliwe (PII). Usuń je z okna czatu i polegaj tylko na maskowaniu treści dokumentu."
         )
 
-    info = file_store[file_id]
+    info = _require_owned_file(request, file_id)
     task_id = str(uuid.uuid4())
 
     # Anonymize text
@@ -525,29 +668,36 @@ async def create_task(
     # Store mapping in vault
     vault.store_session(task_id, token_map)
 
+    user_identity = _get_user_identity(request)
+    now = datetime.now(timezone.utc).isoformat()
     task_store[task_id] = {
         "file_id": file_id,
         "filename": info["filename"],
         "provider": provider_name,
-        "model": model_id or "",
+        "model": resolved_model,
+        "title": _conversation_title(info["filename"], instruction),
         "anonymized_text": anonymized_text,
         "messages": [
-            {"role": "user", "content": instruction}
+            _new_message("user", instruction, provider=provider_name, model=resolved_model)
         ],
         "status": "processing",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now,
+        "last_activity_at": now,
         "pii_masked": len(token_map),
         "error": None,
+        "context_expired": False,
+        "user_id": user_identity["user_id"],
+        "username": user_identity["username"],
     }
 
-    user = _get_user(request)
+    user = user_identity["username"]
     audit.log(
         event="task_created",
         user=user,
         session_id=task_id,
         filename=_sanitize_filename(info["filename"]),
         provider=provider_name,
-        model=model_id or "default",
+        model=resolved_model,
         pii_count=len(token_map),
         pii_types=list({p["type"] for p in info["pii"]}),
         data_left_boundary=False,
@@ -555,13 +705,15 @@ async def create_task(
 
     # Process in background
     background_tasks.add_task(
-        _process_task, task_id, provider_name, token_map, model_id
+        _process_task, task_id, provider_name, token_map, resolved_model
     )
 
-    return {"task_id": task_id, "status": "processing"}
+    return {"task_id": task_id, "conversation_id": task_id, "status": "processing"}
 
 class ChatRequest(BaseModel):
     instruction: str
+    provider: str | None = None
+    model: str | None = None
 
 @app.post("/api/task/{task_id}/chat")
 async def chat_task(
@@ -571,12 +723,16 @@ async def chat_task(
     background_tasks: BackgroundTasks,
 ) -> dict:
     """Add a follow-up message to an existing task and process it."""
-    task = task_store.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _require_owned_task(http_request, task_id)
 
     if task["status"] == "processing":
         raise HTTPException(status_code=400, detail="Task is currently processing")
+
+    if task.get("context_expired"):
+        raise HTTPException(
+            status_code=410,
+            detail="This conversation context expired after inactivity. Open it for history, but start a new conversation to continue processing securely.",
+        )
 
     instruction = request.instruction
     if not instruction.strip():
@@ -596,10 +752,17 @@ async def chat_task(
             detail="Polityka Bezpieczeństwa (Security Guard): Instrukcja zawiera chronione dane wrażliwe (PII). Usuń je z okna czatu."
         )
 
+    provider_name = request.provider or task.get("provider") or settings.default_provider
+    resolved_model = _resolve_model(provider_name, request.model or task.get("model"))
+
     user = _get_user(http_request)
-    task["messages"].append({"role": "user", "content": instruction})
+    task["messages"].append(_new_message("user", instruction, provider=provider_name, model=resolved_model))
     task["status"] = "processing"
     task["error"] = None
+    task["context_expired"] = False
+    task["provider"] = provider_name
+    task["model"] = resolved_model
+    task["last_activity_at"] = datetime.now(timezone.utc).isoformat()
     task_store.persist(task_id)
 
     audit.log(
@@ -607,7 +770,8 @@ async def chat_task(
         user=user,
         session_id=task_id,
         filename=_sanitize_filename(task["filename"]),
-        provider=task["provider"],
+        provider=provider_name,
+        model=resolved_model,
         message_count=len(task["messages"]),
     )
 
@@ -623,26 +787,26 @@ async def chat_task(
 
     # Process in background
     background_tasks.add_task(
-        _process_task, task_id, task["provider"], token_map, task["model"]
+        _process_task, task_id, provider_name, token_map, resolved_model
     )
 
-    return {"task_id": task_id, "status": "processing"}
+    return {"task_id": task_id, "conversation_id": task_id, "status": "processing"}
 
 
 @app.get("/api/task/{task_id}/status")
-async def get_task_status(task_id: str) -> dict:
+async def get_task_status(request: Request, task_id: str) -> dict:
     """Poll task status."""
-    task = task_store.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _require_owned_task(request, task_id)
 
     return {
         "task_id": task_id,
         "status": task["status"],
         "filename": task["filename"],
         "provider": task["provider"],
+        "model": task.get("model", ""),
         "pii_masked": task["pii_masked"],
         "created_at": task["created_at"],
+        "last_activity_at": task.get("last_activity_at", task["created_at"]),
         "error": task.get("error"),
     }
 
@@ -650,9 +814,7 @@ async def get_task_status(task_id: str) -> dict:
 @app.get("/api/task/{task_id}/result")
 async def get_task_result(request: Request, task_id: str) -> dict:
     """Get the processed result with reinjected PII."""
-    task = task_store.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _require_owned_task(request, task_id)
 
     if task["status"] == "processing":
         raise HTTPException(status_code=202, detail="Task still processing")
@@ -669,20 +831,24 @@ async def get_task_result(request: Request, task_id: str) -> dict:
 
     return {
         "task_id": task_id,
+        "conversation_id": task_id,
         "status": task["status"],
         "filename": task["filename"],
+        "title": task.get("title", task["filename"]),
+        "provider": task.get("provider", ""),
+        "model": task.get("model", ""),
         "messages": task["messages"],
         "has_solution": "solution_text" in task,
         "result_preview": task.get("result_preview"),
+        "created_at": task.get("created_at", ""),
+        "last_activity_at": task.get("last_activity_at", task.get("created_at", "")),
     }
 
 
 @app.get("/api/task/{task_id}/download")
 async def download_task_result(request: Request, task_id: str):
     """Download the processed file rebuilt in its original type."""
-    task = task_store.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _require_owned_task(request, task_id)
 
     audit.log(
         event="result_downloaded",
@@ -805,19 +971,62 @@ async def get_providers() -> dict:
 @app.get("/api/tasks")
 async def list_tasks(request: Request) -> dict:
     """Return all tasks for history view."""
+    user_identity = _get_user_identity(request)
     tasks = []
     for task_id, task in task_store.items():
+        if not _record_belongs_to_user(task, user_identity):
+            continue
         tasks.append({
             "task_id": task_id,
             "filename": task["filename"],
+            "title": task.get("title", task["filename"]),
             "provider": task["provider"],
+            "model": task.get("model", ""),
             "status": task["status"],
             "pii_masked": task["pii_masked"],
             "created_at": task["created_at"],
+            "last_activity_at": task.get("last_activity_at", task["created_at"]),
         })
 
-    tasks.sort(key=lambda t: t["created_at"], reverse=True)
+    tasks.sort(key=lambda t: t["last_activity_at"], reverse=True)
     return {"tasks": tasks}
+
+
+@app.get("/api/conversations")
+async def list_conversations(request: Request) -> dict:
+    """Return the authenticated user's conversation list."""
+    user_identity = _get_user_identity(request)
+    conversations = []
+    for task_id, task in task_store.items():
+        if not _record_belongs_to_user(task, user_identity):
+            continue
+        conversations.append(_conversation_summary(task_id, task))
+
+    conversations.sort(key=lambda item: item["last_activity_at"], reverse=True)
+    return {"conversations": conversations}
+
+
+@app.get("/api/conversations/{conversation_id}")
+async def get_conversation(request: Request, conversation_id: str) -> dict:
+    """Return a full conversation payload for reopening an existing thread."""
+    task = _require_owned_task(request, conversation_id)
+    return {
+        "conversation_id": conversation_id,
+        "task_id": conversation_id,
+        "title": task.get("title", task["filename"]),
+        "filename": task["filename"],
+        "file_id": task.get("file_id"),
+        "provider": task.get("provider", ""),
+        "model": task.get("model", ""),
+        "status": task["status"],
+        "messages": task.get("messages", []),
+        "has_solution": "solution_text" in task,
+        "result_preview": task.get("result_preview"),
+        "created_at": task.get("created_at", ""),
+        "last_activity_at": task.get("last_activity_at", task.get("created_at", "")),
+        "pii_masked": task.get("pii_masked", 0),
+        "context_expired": bool(task.get("context_expired")),
+    }
 
 
 @app.get("/api/dashboard")
@@ -894,8 +1103,9 @@ async def _process_task(
 ) -> None:
     """Process a task in the background: send to AI, reinject PII."""
     try:
+        resolved_model = _resolve_model(provider_name, model_id)
         # Get AI provider
-        provider = get_provider(provider_name, get_settings(), model=model_id)
+        provider = get_provider(provider_name, get_settings(), model=resolved_model)
         if not provider:
             raise ValueError(f"Provider '{provider_name}' is not configured")
 
@@ -1021,12 +1231,19 @@ async def _process_task(
             clean_msg = re.sub(r"<ROZWIAZANIE>.*?</ROZWIAZANIE>", "", result_text, flags=re.DOTALL).strip()
             if not clean_msg:
                 clean_msg = "Plik został przetworzony. Sprawdź podgląd poniżej i pobierz wynik."
-            task_store[task_id]["messages"].append({"role": "assistant", "content": clean_msg})
+            task_store[task_id]["messages"].append(
+                _new_message("assistant", clean_msg, provider=provider_name, model=resolved_model)
+            )
         else:
             # Normal chat message (no file result)
-            task_store[task_id]["messages"].append({"role": "assistant", "content": result_text})
+            task_store[task_id]["messages"].append(
+                _new_message("assistant", result_text, provider=provider_name, model=resolved_model)
+            )
 
         task_store[task_id]["status"] = "completed"
+        task_store[task_id]["provider"] = provider_name
+        task_store[task_id]["model"] = resolved_model
+        task_store[task_id]["last_activity_at"] = datetime.now(timezone.utc).isoformat()
         task_store.persist(task_id)
 
         # Do not delete session or file yet, the user might want to continue chat
@@ -1041,6 +1258,7 @@ async def _process_task(
         logger.error(f"Task {task_id} failed: {safe_error}")
         task_store[task_id]["status"] = "failed"
         task_store[task_id]["error"] = safe_error
+        task_store[task_id]["last_activity_at"] = datetime.now(timezone.utc).isoformat()
         task_store.persist(task_id)
 
         audit.log(

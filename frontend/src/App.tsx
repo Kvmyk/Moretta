@@ -29,7 +29,7 @@ function App() {
                 Moretta
               </h1>
             </NavLink>
-            <p className="text-[9px] text-pp-accent-light opacity-50 uppercase tracking-[0.25em] font-medium">v0.7 SELF-HOSTED</p>
+            <p className="text-[9px] text-pp-accent-light opacity-50 uppercase tracking-[0.25em] font-medium">v0.7.5 SELF-HOSTED</p>
             <div className="mt-4 text-xs text-pp-text-muted">
               <div className="truncate">{keycloak.tokenParsed?.preferred_username ?? 'authenticated-user'}</div>
               <button

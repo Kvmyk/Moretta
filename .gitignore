@@ -73,6 +73,7 @@ __MACOSX/
 
 
 data/
+.tmp_sqlite/
 uploads/
 **/uploads/
 *.db
