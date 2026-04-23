@@ -12,6 +12,8 @@ import logging
 from docx import Document
 from docx.oxml.ns import qn
 from pathlib import Path
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 logger = logging.getLogger("moretta.rebuilders")
 
@@ -199,4 +201,42 @@ def rebuild_docx(text: str, template_path: str | None = None) -> bytes:
         return stream.getvalue()
     except Exception as exc:
         logger.error(f"Error in rebuild_docx: {str(exc)[:200]}")
+        raise
+
+
+def rebuild_pdf(text: str) -> bytes:
+    """
+    Reconstruct a PDF file from plain text.
+    """
+    try:
+        stream = io.BytesIO()
+        pdf = canvas.Canvas(stream, pagesize=A4)
+        width, height = A4
+
+        margin_x = 50
+        margin_y = 50
+        line_height = 14
+        y = height - margin_y
+
+        for paragraph in text.splitlines():
+            line = paragraph.rstrip()
+            if not line:
+                y -= line_height
+                if y < margin_y:
+                    pdf.showPage()
+                    y = height - margin_y
+                continue
+
+            chunks = [line[i:i + 110] for i in range(0, len(line), 110)]
+            for chunk in chunks:
+                pdf.drawString(margin_x, y, chunk)
+                y -= line_height
+                if y < margin_y:
+                    pdf.showPage()
+                    y = height - margin_y
+
+        pdf.save()
+        return stream.getvalue()
+    except Exception as exc:
+        logger.error(f"Error in rebuild_pdf: {str(exc)[:200]}")
         raise

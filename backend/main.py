@@ -33,7 +33,8 @@ from reinjektor.reinjektor import Reinjektor
 from parsers.docx_parser import parse_docx
 from parsers.xlsx_parser import parse_xlsx
 from parsers.email_parser import parse_email
-from rebuilders import rebuild_xlsx, rebuild_docx
+from parsers.pdf_parser import parse_pdf
+from rebuilders import rebuild_xlsx, rebuild_docx, rebuild_pdf
 from providers.base import get_provider
 from providers.models_registry import get_default_model
 from audit.audit_log import AuditLogger
@@ -54,7 +55,7 @@ access_logger = logging.getLogger("moretta.access")
 app = FastAPI(
     title="Moretta",
     description="Self-hosted AI proxy with PII anonymization",
-    version="0.7.5",
+    version="0.8",
 )
 
 app.add_middleware(
@@ -127,7 +128,7 @@ auth_validator = OIDCValidator(
 
 # ── Helpers ────────────────────────────────────────────────────────
 
-SUPPORTED_EXTENSIONS = {".docx", ".xlsx", ".eml", ".msg"}
+SUPPORTED_EXTENSIONS = {".docx", ".xlsx", ".pdf", ".eml", ".msg"}
 
 
 def _parse_file(path: Path, ext: str) -> dict[str, Any]:
@@ -136,6 +137,8 @@ def _parse_file(path: Path, ext: str) -> dict[str, Any]:
         return parse_docx(path)
     elif ext == ".xlsx":
         return parse_xlsx(path)
+    elif ext == ".pdf":
+        return parse_pdf(path)
     elif ext in (".eml", ".msg"):
         return parse_email(path)
     raise ValueError(f"Unsupported file extension: {ext}")
@@ -320,7 +323,7 @@ async def startup_event() -> None:
     task_store.initialize()
     vault.initialize()
     asyncio.create_task(_cleanup_expired_sessions())
-    logger.info(f"Moretta backend v0.7.5 started ({len(file_store)} files, {len(task_store)} tasks restored)")
+    logger.info(f"Moretta backend v0.8 started ({len(file_store)} files, {len(task_store)} tasks restored)")
 
 
 @app.middleware("http")
@@ -892,6 +895,9 @@ async def download_task_result(request: Request, task_id: str):
         elif ext == ".docx":
             content_bytes = rebuild_docx(text, template_path=template_path)
             media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif ext == ".pdf":
+            content_bytes = rebuild_pdf(text)
+            media_type = "application/pdf"
         else:
             content_bytes = text.encode("utf-8")
             media_type = "text/plain"

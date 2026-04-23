@@ -85,6 +85,20 @@ def sample_xlsx(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
+def sample_pdf(tmp_path: Path) -> Path:
+    """Create a minimal .pdf file for upload testing."""
+    pytest.importorskip("reportlab")
+    from reportlab.pdfgen import canvas
+
+    path = tmp_path / "test_document.pdf"
+    pdf = canvas.Canvas(str(path))
+    pdf.drawString(100, 750, "Jan Kowalski, PESEL 92010212345")
+    pdf.drawString(100, 730, "Numer telefonu: 600 123 456")
+    pdf.save()
+    return path
+
+
+@pytest.fixture()
 def sample_text() -> str:
     """Sample text containing PII for testing."""
     return "Umowa pomiędzy Jan Kowalski (PESEL 92010212345) a firmą ABC Sp. z o.o."

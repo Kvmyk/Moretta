@@ -181,10 +181,10 @@ class TestUploadFlow:
     """Test file upload and text submission."""
 
     def test_upload_unsupported_file(self, client, tmp_path: Path):
-        bad_file = tmp_path / "test.pdf"
-        bad_file.write_text("not a real pdf")
+        bad_file = tmp_path / "test.bin"
+        bad_file.write_text("not a supported format")
         with open(bad_file, "rb") as f:
-            res = client.post("/api/upload", files={"file": ("test.pdf", f)})
+            res = client.post("/api/upload", files={"file": ("test.bin", f)})
         assert res.status_code == 400
         assert "Unsupported" in res.json()["detail"]
 
@@ -220,6 +220,22 @@ class TestUploadFlow:
         assert len(preview["preview_data"]["sheets"]) >= 1
         first_sheet_rows = preview["preview_data"]["sheets"][0]["rows"]
         assert any("Imie i nazwisko" in str(cell) for row in first_sheet_rows for cell in row)
+
+    def test_upload_pdf_file(self, client, sample_pdf: Path):
+        with open(sample_pdf, "rb") as f:
+            res = client.post("/api/upload", files={"file": (sample_pdf.name, f)})
+        assert res.status_code == 200
+        data = res.json()
+        assert "file_id" in data
+        assert data["filename"].endswith(".pdf")
+        assert data["size_bytes"] > 0
+
+        preview_res = client.get(f"/api/file/{data['file_id']}/preview")
+        assert preview_res.status_code == 200
+        preview = preview_res.json()
+        assert preview["preview_data"]["type"] == "document"
+        assert isinstance(preview["preview_data"]["text"], str)
+        assert len(preview["preview_data"]["text"]) > 0
 
     def test_text_submission(self, client, sample_text: str):
         res = client.post(

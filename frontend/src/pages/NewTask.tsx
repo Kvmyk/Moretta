@@ -111,7 +111,7 @@ function NewTask() {
 
   const handleFileAction = useCallback((file: File) => {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    const allowed = ['.docx', '.xlsx', '.eml', '.msg', '.txt'];
+    const allowed = ['.docx', '.xlsx', '.pdf', '.eml', '.msg', '.txt'];
     if (allowed.includes(ext)) {
       setSearchParams({}, { replace: true });
       setSelectedFile(file);

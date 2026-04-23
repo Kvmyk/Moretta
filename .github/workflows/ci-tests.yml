@@ -27,7 +27,7 @@ jobs:
 
       - name: Run backend tests (deep-scan + migration formats + upload formats)
         run: |
-          pytest -q backend/tests/test_detector.py backend/tests/test_migration_formats.py backend/tests/test_core.py -k "deep_scan or upload_docx_file or upload_xlsx_file or migration_preserves_docx_blob_content or migration_preserves_xlsx_blob_content"
+          pytest -q backend/tests/test_detector.py backend/tests/test_migration_formats.py backend/tests/test_core.py -k "deep_scan or upload_docx_file or upload_xlsx_file or upload_pdf_file or migration_preserves_docx_blob_content or migration_preserves_xlsx_blob_content"
 
   frontend-build:
     name: Frontend Build

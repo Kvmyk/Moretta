@@ -22,6 +22,7 @@ function FileUpload({ onFileDrop, isLoading, error }: FileUploadProps) {
     accept: {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/pdf': ['.pdf'],
       'message/rfc822': ['.eml'],
       'application/vnd.ms-outlook': ['.msg'],
     },
@@ -66,7 +67,7 @@ function FileUpload({ onFileDrop, isLoading, error }: FileUploadProps) {
               <p className="text-sm text-pp-text font-medium">
                 Przeciągnij plik lub <span className="text-pp-accent underline">wybierz z dysku</span>
               </p>
-              <p className="text-xs text-pp-text-muted mt-1">DOCX, XLSX, EML, MSG — maks. 50 MB</p>
+              <p className="text-xs text-pp-text-muted mt-1">DOCX, XLSX, PDF, EML, MSG — maks. 50 MB</p>
             </div>
             <div className="flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-pp-green/20 rounded-full">
               <div className="w-1.5 h-1.5 bg-pp-green-text rounded-full" />

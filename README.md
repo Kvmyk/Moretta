@@ -1,10 +1,10 @@
-# Moretta v0.7.5
+# Moretta v0.8
 
 Moretta is a self-hosted proxy for secure AI usage in enterprise environments. It automatically detects and anonymizes confidential data (PII) from uploaded documents before sending them to external AI models. After the AI processes the anonymized text, Moretta reinjects the original data back. This ensures no data leakage outside your local network.
 
 ## How It Works
 
-1. User uploads a DOCX, XLSX, or EML file.
+1. User uploads a DOCX, XLSX, PDF, or EML file.
 2. System parses the file and detects PII using Microsoft Presidio and a local Ollama model.
 3. PII is replaced with UUID tokens and the mapping is saved in the encrypted application database.
 4. Anonymized text is sent to an external AI API (Claude, GPT, Gemini, OpenRouter, or local Ollama).
