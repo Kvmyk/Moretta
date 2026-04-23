@@ -55,6 +55,7 @@ def client():
 @pytest.fixture()
 def sample_docx(tmp_path: Path) -> Path:
     """Create a minimal .docx file for upload testing."""
+    pytest.importorskip("docx")
     from docx import Document
 
     doc = Document()
@@ -62,6 +63,24 @@ def sample_docx(tmp_path: Path) -> Path:
     doc.add_paragraph("Numer telefonu: 600 123 456, email: jan@firma.pl")
     path = tmp_path / "test_document.docx"
     doc.save(str(path))
+    return path
+
+
+@pytest.fixture()
+def sample_xlsx(tmp_path: Path) -> Path:
+    """Create a minimal .xlsx file for upload testing."""
+    pytest.importorskip("openpyxl")
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Dane"
+    ws["A1"] = "Imie i nazwisko"
+    ws["B1"] = "PESEL"
+    ws["A2"] = "Jan Kowalski"
+    ws["B2"] = "92010212345"
+    path = tmp_path / "test_sheet.xlsx"
+    wb.save(str(path))
     return path
 
 

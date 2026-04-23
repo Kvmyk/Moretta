@@ -10,11 +10,11 @@
   - The notification should direct the administrator to a documentation page or provide instructions on how to manually update safely (e.g., `git pull && docker compose pull && docker compose up -d`).
   - Create a lightweight `update.sh` / `update.bat` script in the repository to make the process a 1-click execution for the administrator.
 
-- [ ] **Chat History Preservation**
+- [x] **Chat History Preservation**
   - Implement logic to store chat sessions (user prompts, AI responses, and metadata) persistently in the database.
   - Add UI functionality to fetch, view, and manage past conversations.
 
-- [ ] **Conversation List & Multi-Model Thread Metadata**
+- [x] **Conversation List & Multi-Model Thread Metadata**
   - Create a persistent conversation index/list view in the database and frontend sidebar/history view.
   - Scope conversations to the authenticated user account, so each user sees only their own threads and history.
   - Store per-conversation metadata such as `conversation_id`, title/summary, creation date, last activity date, selected provider, selected model, and task/file linkage.
@@ -23,7 +23,7 @@
   - Add filtering/sorting in the UI by date, provider, model, and conversation status.
   - Ensure reopening a conversation restores the full message history together with provider/model context for each turn.
 
-- [ ] **SQLite3 -> PostgreSQL Migration Plan**
+- [x] **SQLite3 -> PostgreSQL Migration Plan**
   - Inventory all current SQLite-backed components: `backend/store.py`, `backend/anonymizer/vault.py`, `backend/config.py`, `data/store.db`, and `data/vault.db`.
   - Decide whether PostgreSQL should fully replace SQLite or be an optional production backend while SQLite remains for lightweight local setups.
   - Introduce a storage abstraction / repository layer so `PersistentStore` and `Vault` are not tied directly to `sqlite3`.
@@ -50,10 +50,10 @@
 ## CI/CD Pipeline (GitHub Actions)
 
 - [ ] **1. Standard CI / Tests (Priority)**
-  - Implement automated unit tests (`pytest`), ensuring that `detector.py` and PII logic always work correctly before merging.
-  - Write specific unit tests masking the Deep Scan / Ollama (`detect_deep_async`), utilizing `unittest.mock` to simulate context-aware AI detections.
+  - [x] Implement automated unit tests (`pytest`), ensuring that `detector.py` and PII logic always work correctly before merging.
+  - [x] Write specific unit tests masking the Deep Scan / Ollama (`detect_deep_async`), utilizing `unittest.mock` to simulate context-aware AI detections.
   - Configure formatters and linters (e.g., Ruff for Python, ESLint/Prettier for React) to enforce clean and consistent code.
-  - Add static type checking (MyPy for Python, TSC for TypeScript) to catch errors early at the Pull Request stage.
+  - [x] Add static type checking (MyPy for Python, TSC for TypeScript) to catch errors early at the Pull Request stage.
 
 - [ ] **2. Security & Compliance (Critical for AI Gateway)**
   - Configure Secret Scanning (TruffleHog / GitHub Advanced Security) to prevent accidental API key leaks (e.g., OpenAI) in the repository.
