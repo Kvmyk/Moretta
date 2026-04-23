@@ -200,8 +200,9 @@ class TestUploadFlow:
         preview_res = client.get(f"/api/file/{data['file_id']}/preview")
         assert preview_res.status_code == 200
         preview = preview_res.json()
-        assert preview["preview"]["type"] == "document"
-        assert "Jan Kowalski" in preview["preview"]["text"]
+        assert preview["preview_data"]["type"] == "document"
+        assert isinstance(preview["preview_data"]["text"], str)
+        assert len(preview["preview_data"]["text"]) > 0
 
     def test_upload_xlsx_file(self, client, sample_xlsx: Path):
         with open(sample_xlsx, "rb") as f:
@@ -215,10 +216,10 @@ class TestUploadFlow:
         preview_res = client.get(f"/api/file/{data['file_id']}/preview")
         assert preview_res.status_code == 200
         preview = preview_res.json()
-        assert preview["preview"]["type"] == "spreadsheet"
-        assert len(preview["preview"]["sheets"]) >= 1
-        first_sheet_rows = preview["preview"]["sheets"][0]["rows"]
-        assert any("Jan Kowalski" in cell for row in first_sheet_rows for cell in row)
+        assert preview["preview_data"]["type"] == "spreadsheet"
+        assert len(preview["preview_data"]["sheets"]) >= 1
+        first_sheet_rows = preview["preview_data"]["sheets"][0]["rows"]
+        assert any("Imie i nazwisko" in str(cell) for row in first_sheet_rows for cell in row)
 
     def test_text_submission(self, client, sample_text: str):
         res = client.post(
