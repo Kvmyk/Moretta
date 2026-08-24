@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../auth/apiFetch';
+import { ApiError, apiFetchJson } from '../auth/apiFetch';
+import AdminOnlyNotice from '../components/AdminOnlyNotice';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
@@ -36,13 +37,14 @@ const PROVIDER_LABELS: Record<string, string> = {
 function Dashboard() {
   const { data, isLoading, error } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
-    queryFn: async () => {
-      const res = await apiFetch('/api/dashboard');
-      if (!res.ok) throw new Error('Failed to fetch dashboard');
-      return res.json();
-    },
+    queryFn: () => apiFetchJson<DashboardData>('/api/dashboard'),
     refetchInterval: 30000,
+    retry: (count, err) => !(err instanceof ApiError && err.isForbidden) && count < 1,
   });
+
+  if (error instanceof ApiError && error.isForbidden) {
+    return <AdminOnlyNotice resource="dashboard" />;
+  }
 
   if (isLoading) {
     return (

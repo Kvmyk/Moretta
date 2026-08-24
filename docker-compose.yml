@@ -1,42 +1,28 @@
-version: "3.8"
-
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: privateproxy-postgres
-    environment:
-      POSTGRES_DB: moretta
-      POSTGRES_USER: moretta
-      POSTGRES_PASSWORD: moretta
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U moretta -d moretta"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - privateproxy-net
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: privateproxy-backend
+    # Bound to loopback: the API must only be reachable through the frontend
+    # proxy, which terminates auth and enforces the upload size limit.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     volumes:
       - ./data:/app/data
     depends_on:
-      postgres:
-        condition: service_healthy
       ollama:
         condition: service_started
       keycloak:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=5).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
     networks:
       - privateproxy-net
@@ -55,6 +41,11 @@ services:
     depends_on:
       - backend
       - keycloak
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
     networks:
       - privateproxy-net
@@ -62,8 +53,9 @@ services:
   ollama:
     image: ollama/ollama
     container_name: privateproxy-ollama
+    # Ollama has no authentication of its own — keep it off the host network.
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
@@ -75,8 +67,8 @@ services:
     container_name: privateproxy-keycloak
     command: start-dev --import-realm --http-port=8080
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_PROXY_HEADERS: xforwarded
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME: http://localhost:3000
@@ -86,14 +78,13 @@ services:
       - ./keycloak/realm-moretta.json:/opt/keycloak/data/import/realm-moretta.json:ro
       - ./keycloak/themes/moretta:/opt/keycloak/themes/moretta:ro
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     restart: unless-stopped
     networks:
       - privateproxy-net
 
 volumes:
   ollama_data:
-  postgres_data:
 
 networks:
   privateproxy-net:

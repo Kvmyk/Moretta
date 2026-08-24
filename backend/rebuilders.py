@@ -6,14 +6,12 @@ preserving the original document's formatting/styles.
 
 import io
 import os
-import copy
 import openpyxl
 import logging
+from xml.sax.saxutils import escape
 from docx import Document
 from docx.oxml.ns import qn
-from pathlib import Path
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 
 logger = logging.getLogger("moretta.rebuilders")
 
@@ -43,7 +41,6 @@ def rebuild_xlsx(text: str, template_path: str | None = None) -> bytes:
 
         # Step 2: Fill in the AI text
         current_sheet = None
-        row_offset = 0
 
         import re
         # Pattern to match cell coordinates like "A1: Value" or "AB123: Value"
@@ -68,7 +65,6 @@ def rebuild_xlsx(text: str, template_path: str | None = None) -> bytes:
                 else:
                     current_sheet = wb.create_sheet(title=sheet_name[:31])
                     logger.debug(f"Created new sheet: {sheet_name}")
-                row_offset = 0
                 max_row = 1
                 continue
 
@@ -97,8 +93,8 @@ def rebuild_xlsx(text: str, template_path: str | None = None) -> bytes:
                     cell = current_sheet.cell(row=max_row, column=1)
                     if type(cell).__name__ != 'MergedCell':
                         cell.value = line
-                except Exception as e:
-                    pass
+                except Exception:
+                    logger.debug("Skipped unwritable fallback cell")
 
         stream = io.BytesIO()
         wb.save(stream)
@@ -207,35 +203,33 @@ def rebuild_docx(text: str, template_path: str | None = None) -> bytes:
 def rebuild_pdf(text: str) -> bytes:
     """
     Reconstruct a PDF file from plain text.
+
+    reportlab's Paragraph parses a small HTML-like markup, so document text must
+    be escaped first — otherwise any '<' or '&' in the AI output (or in the
+    original document) aborts the whole download.
     """
     try:
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+
         stream = io.BytesIO()
-        pdf = canvas.Canvas(stream, pagesize=A4)
-        width, height = A4
+        doc = SimpleDocTemplate(stream, pagesize=A4)
+        styles = getSampleStyleSheet()
+        style = styles["Normal"]
 
-        margin_x = 50
-        margin_y = 50
-        line_height = 14
-        y = height - margin_y
-
+        story = []
         for paragraph in text.splitlines():
             line = paragraph.rstrip()
             if not line:
-                y -= line_height
-                if y < margin_y:
-                    pdf.showPage()
-                    y = height - margin_y
+                story.append(Spacer(1, 12))
                 continue
 
-            chunks = [line[i:i + 110] for i in range(0, len(line), 110)]
-            for chunk in chunks:
-                pdf.drawString(margin_x, y, chunk)
-                y -= line_height
-                if y < margin_y:
-                    pdf.showPage()
-                    y = height - margin_y
+            story.append(Paragraph(escape(line), style))
 
-        pdf.save()
+        if not story:
+            story.append(Spacer(1, 12))
+
+        doc.build(story)
         return stream.getvalue()
     except Exception as exc:
         logger.error(f"Error in rebuild_pdf: {str(exc)[:200]}")

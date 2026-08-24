@@ -14,6 +14,8 @@ import httpx
 from presidio_analyzer import AnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 
+from anonymizer.validators import CHECKSUM_VALIDATORS
+
 logger = logging.getLogger("moretta.detector")
 
 # ── Polish PII type names ──────────────────────────────────────────
@@ -67,9 +69,18 @@ POLISH_REGEX_RULES = [
 class PiiDetector:
     """Two-stage PII detection: Presidio + Ollama LLM."""
 
-    def __init__(self, ollama_url: str, model: str) -> None:
+    def __init__(
+        self,
+        ollama_url: str,
+        model: str,
+        *,
+        deep_scan_chunk_chars: int = 4_000,
+        deep_scan_max_chunks: int = 12,
+    ) -> None:
         self._ollama_url = ollama_url.rstrip("/")
         self._model = model
+        self._deep_scan_chunk_chars = deep_scan_chunk_chars
+        self._deep_scan_max_chunks = deep_scan_max_chunks
 
         # Initialize Presidio with Polish NLP
         try:
@@ -149,16 +160,23 @@ class PiiDetector:
                 if not stripped_text:
                     continue
                     
+                # These identifiers all carry a check digit. Without verifying it
+                # "any 11 digits" is a PESEL and "any 9 digits" is a REGON, which
+                # masked invoice numbers and amounts out of otherwise fine documents.
+                validator = CHECKSUM_VALIDATORS.get(rule["type"])
+                if validator is not None and not validator(stripped_text):
+                    continue
+
                 start_offset = matched_text.find(stripped_text)
                 actual_start = match.start() + start_offset
                 actual_end = actual_start + len(stripped_text)
-                
+
                 results.append({
                     "text": stripped_text,
                     "type": rule["type"],
                     "start": actual_start,
                     "end": actual_end,
-                    "score": 0.85,
+                    "score": 0.95 if validator is not None else 0.85,
                     "source": "regex",
                 })
 
@@ -190,12 +208,47 @@ class PiiDetector:
                         return True
         return False
 
-    async def detect_deep_async(self, text: str, existing_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Stage 2: Asynchronous Deep Scan via local LLM (Ollama)."""
-        # Truncate very long texts to fit model context
-        MAX_CHARS = 4000
-        fragment = text[:MAX_CHARS] if len(text) > MAX_CHARS else text
+    def _split_for_deep_scan(self, text: str) -> list[str]:
+        """
+        Split text into model-sized chunks, preferring line boundaries.
 
+        Earlier versions scanned only the first 4000 characters, so contextual
+        PII in the rest of a long document was never detected at all.
+        """
+        limit = self._deep_scan_chunk_chars
+        if len(text) <= limit:
+            return [text] if text else []
+
+        chunks: list[str] = []
+        start = 0
+        while start < len(text) and len(chunks) < self._deep_scan_max_chunks:
+            end = min(start + limit, len(text))
+            if end < len(text):
+                # Back off to the last newline so we do not cut mid-sentence.
+                boundary = text.rfind("\n", start + limit // 2, end)
+                if boundary > start:
+                    end = boundary
+            chunks.append(text[start:end])
+            start = end
+
+        if start < len(text):
+            logger.warning(
+                "Deep scan truncated: %s of %s chars scanned (chunk cap reached)",
+                start,
+                len(text),
+            )
+        return chunks
+
+    async def detect_deep_async(self, text: str, existing_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Stage 2: Asynchronous Deep Scan via local LLM (Ollama), chunk by chunk."""
+        raw_items: list[dict[str, Any]] = []
+        for fragment in self._split_for_deep_scan(text):
+            raw_items.extend(await self._deep_scan_fragment(fragment))
+
+        return self._locate_deep_items(text, raw_items, existing_results)
+
+    async def _deep_scan_fragment(self, fragment: str) -> list[dict[str, Any]]:
+        """Ask the local model for contextual PII inside a single fragment."""
         prompt = (
             "Jesteś rygorystycznym, automatycznym systemem DLP (Data Leak Prevention). Zewnętrzny system przetwarza już standardowe dane jak PESEL, NIP, numery telefonów czy IBAN - zignoruj je.\n\n"
             "Twoim JEDYNYM zadaniem jest znalezienie i wyodrębnienie w tekście niestandardowych, ryzykownych danych biznesowych:\n"
@@ -241,47 +294,60 @@ class PiiDetector:
 
             start_idx = raw_response.find("[")
             end_idx = raw_response.rfind("]")
-            if start_idx != -1 and end_idx != -1:
-                json_str = raw_response[start_idx:end_idx + 1]
-                items = json.loads(json_str)
-            else:
-                items = []
-                
-            new_results = []
-            for item in items:
-                if isinstance(item, dict) and "text" in item and "type" in item:
-                    text_found = item["text"].strip()
-                    if not text_found:
-                        continue
+            if start_idx == -1 or end_idx == -1:
+                return []
 
-                    # Try to find all occurrences of this text (case-insensitive)
-                    pattern = re.compile(re.escape(text_found), re.IGNORECASE)
-                    matches_found = list(pattern.finditer(text))
-                    
-                    if not matches_found and len(text_found) > 3:
-                        # Fallback for Polish declension: if it's a longer string, try matching the prefix 
-                        # or allow minor character differences at the end.
-                        # We use a fuzzy regex that allows some characters after the word core.
-                        core = text_found[:-1] if len(text_found) > 4 else text_found
-                        fuzzy_pattern = re.compile(re.escape(core) + r"[a-ząęółńśćźż]{0,3}", re.IGNORECASE)
-                        matches_found = list(fuzzy_pattern.finditer(text))
+            items = json.loads(raw_response[start_idx:end_idx + 1])
+            return [
+                item
+                for item in items
+                if isinstance(item, dict) and item.get("text") and item.get("type")
+            ]
 
-                    for match in matches_found:
-                        pii_entry = {
-                            "text": text[match.start():match.end()], # Extract ACTUAL literal text
-                            "type": item.get("type", "OTHER_PII"),
-                            "start": match.start(),
-                            "end": match.end(),
-                            "score": 0.6,
-                            "source": "ollama_deep",
-                        }
-                        if not self._is_duplicate(pii_entry, existing_results) and not self._is_duplicate(pii_entry, new_results):
-                            new_results.append(pii_entry)
-
-            
-            logger.info(f"Ollama deep scan finished. Detected {len(new_results)} new entities.")
-            return new_results
-
-        except Exception as exc:
-            logger.exception("Ollama deep scan failed:")
+        except Exception:
+            logger.exception("Ollama deep scan fragment failed:")
             return []
+
+    def _locate_deep_items(
+        self,
+        text: str,
+        items: list[dict[str, Any]],
+        existing_results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Map model-reported fragments back onto exact offsets in the full text."""
+        new_results: list[dict[str, Any]] = []
+        seen_fragments: set[str] = set()
+
+        for item in items:
+            text_found = str(item["text"]).strip()
+            if not text_found or text_found.lower() in seen_fragments:
+                continue
+            seen_fragments.add(text_found.lower())
+
+            # Try to find all occurrences of this text (case-insensitive)
+            pattern = re.compile(re.escape(text_found), re.IGNORECASE)
+            matches_found = list(pattern.finditer(text))
+
+            if not matches_found and len(text_found) > 3:
+                # Fallback for Polish declension: allow a short suffix after the
+                # word core so "Projekt" still matches "Projektu".
+                core = text_found[:-1] if len(text_found) > 4 else text_found
+                fuzzy_pattern = re.compile(
+                    re.escape(core) + r"[a-ząęółńśćźż]{0,3}", re.IGNORECASE
+                )
+                matches_found = list(fuzzy_pattern.finditer(text))
+
+            for match in matches_found:
+                pii_entry = {
+                    "text": text[match.start():match.end()],  # Extract ACTUAL literal text
+                    "type": item.get("type", "OTHER_PII"),
+                    "start": match.start(),
+                    "end": match.end(),
+                    "score": 0.6,
+                    "source": "ollama_deep",
+                }
+                if not self._is_duplicate(pii_entry, existing_results) and not self._is_duplicate(pii_entry, new_results):
+                    new_results.append(pii_entry)
+
+        logger.info(f"Ollama deep scan finished. Detected {len(new_results)} new entities.")
+        return new_results

@@ -19,3 +19,27 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     headers,
   });
 }
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
+}
+
+/** Fetch JSON, turning non-2xx responses into a typed ApiError. */
+export async function apiFetchJson<T>(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<T> {
+  const res = await apiFetch(input, init);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body?.detail || `Request failed (${res.status})`, res.status);
+  }
+  return res.json() as Promise<T>;
+}

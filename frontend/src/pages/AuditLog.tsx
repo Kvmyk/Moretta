@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '../auth/apiFetch';
+import { ApiError, apiFetch, apiFetchJson } from '../auth/apiFetch';
+import AdminOnlyNotice from '../components/AdminOnlyNotice';
 
 interface AuditEntry {
   timestamp: string;
@@ -19,13 +20,13 @@ function AuditLog() {
   const [limit] = useState(100);
   const [offset, setOffset] = useState(0);
 
-  const { data, isLoading } = useQuery<{ entries: AuditEntry[]; total: number }>({
+  const { data, isLoading, error } = useQuery<{ entries: AuditEntry[]; total: number }>({
     queryKey: ['audit', limit, offset],
-    queryFn: async () => {
-      const res = await apiFetch(`/api/audit?limit=${limit}&offset=${offset}`);
-      if (!res.ok) throw new Error('Failed to fetch audit log');
-      return res.json();
-    },
+    queryFn: () =>
+      apiFetchJson<{ entries: AuditEntry[]; total: number }>(
+        `/api/audit?limit=${limit}&offset=${offset}`,
+      ),
+    retry: (count, err) => !(err instanceof ApiError && err.isForbidden) && count < 1,
   });
 
   const formatTimestamp = (iso: string) => {
@@ -89,6 +90,10 @@ function AuditLog() {
       console.error('CSV export failed:', err);
     }
   };
+
+  if (error instanceof ApiError && error.isForbidden) {
+    return <AdminOnlyNotice resource="audit log" />;
+  }
 
   const total = data?.total ?? 0;
   const canPrev = offset > 0;

@@ -19,15 +19,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+          python -m spacy download pl_core_news_sm
 
-      - name: Run backend tests (deep-scan + migration formats + upload formats)
-        run: |
-          pytest -q backend/tests/test_detector.py backend/tests/test_migration_formats.py backend/tests/test_core.py -k "deep_scan or upload_docx_file or upload_xlsx_file or upload_pdf_file or migration_preserves_docx_blob_content or migration_preserves_xlsx_blob_content"
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest -q
 
   frontend-build:
     name: Frontend Build

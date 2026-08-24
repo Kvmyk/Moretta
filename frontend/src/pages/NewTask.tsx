@@ -87,7 +87,9 @@ function NewTask() {
   // AI Config
   const [instruction, setInstruction] = useState('');
   const [provider, setProvider] = useState('claude');
-  const [model, setModel] = useState('claude-sonnet-4.6-20260217');
+  // Left empty on purpose: ProviderSelector fills it from /api/providers once
+  // the registry loads. Hardcoding an id here drifts out of sync with the backend.
+  const [model, setModel] = useState('');
   
   // Task states
   const [taskId, setTaskId] = useState<string | null>(null);

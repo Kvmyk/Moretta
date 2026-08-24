@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ class AuditLogger:
     def __init__(self, log_path: Path) -> None:
         self._log_path = log_path
         self._lock = threading.Lock()
+        self._count_cache: tuple[int, int] | None = None
 
     def log(self, event: str, **kwargs: Any) -> None:
         """
@@ -57,6 +59,28 @@ class AuditLogger:
 
         logger.debug(f"Audit: {event} — {kwargs.get('session_id', '')[:8]}")
 
+    def _iter_tail(self, keep: int) -> list[dict[str, Any]]:
+        """
+        Return the last `keep` parsed entries, oldest first.
+
+        The log is append-only and never rotated, so it must be streamed with a
+        bounded buffer instead of being materialised in full on every request.
+        """
+        if not self._log_path.exists():
+            return []
+
+        window: deque[dict[str, Any]] = deque(maxlen=keep)
+        with open(self._log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    window.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return list(window)
+
     def read(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """
         Read audit log entries.
@@ -68,35 +92,39 @@ class AuditLogger:
         Returns:
             List of audit entries, most recent first.
         """
-        if not self._log_path.exists():
-            return []
-
-        entries: list[dict[str, Any]] = []
-        with open(self._log_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        entries.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-
-        # Return most recent first
-        entries.reverse()
-
-        # Apply pagination
+        entries = self._iter_tail(offset + limit)
+        entries.reverse()  # most recent first
         return entries[offset:offset + limit]
 
+    def read_tail(self, limit: int = 10_000) -> list[dict[str, Any]]:
+        """Return up to `limit` most recent entries, most recent first."""
+        entries = self._iter_tail(limit)
+        entries.reverse()
+        return entries
+
     def count(self) -> int:
-        """Return the total number of audit entries."""
+        """
+        Return the total number of audit entries.
+
+        Cached against the file size so the dashboard does not rescan the whole
+        log on every poll.
+        """
         if not self._log_path.exists():
             return 0
+
+        size = self._log_path.stat().st_size
+        with self._lock:
+            if self._count_cache is not None and self._count_cache[0] == size:
+                return self._count_cache[1]
 
         count = 0
         with open(self._log_path, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     count += 1
+
+        with self._lock:
+            self._count_cache = (size, count)
         return count
 
     def export_csv(self) -> str:

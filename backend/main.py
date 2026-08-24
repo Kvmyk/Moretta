@@ -11,35 +11,36 @@ import re as _re
 import tempfile
 import time
 import logging
-import os
 import uuid
-import shutil
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
 import io
 
-from config import get_settings
+from config import APP_VERSION, get_settings
 from anonymizer.detector import PiiDetector
 from anonymizer.guard import SecurityGuard
 from anonymizer.replacer import PiiReplacer
-from anonymizer.vault import Vault
+from anonymizer.vault import Vault, VaultSessionError
 from reinjektor.reinjektor import Reinjektor
 from parsers.docx_parser import parse_docx
 from parsers.xlsx_parser import parse_xlsx
 from parsers.email_parser import parse_email
 from parsers.pdf_parser import parse_pdf
+from parsers.txt_parser import parse_txt
 from rebuilders import rebuild_xlsx, rebuild_docx, rebuild_pdf
 from providers.base import get_provider
-from providers.models_registry import get_default_model
+from providers.models_registry import get_default_model, get_models_for_provider
 from audit.audit_log import AuditLogger
 from auth import AuthConfig, AuthError, OIDCValidator
 from store import PersistentStore
+from text_utils import build_masking_pattern, mask_with_token_map
 
 # ── Setup ──────────────────────────────────────────────────────────
 
@@ -52,83 +53,106 @@ logging.basicConfig(
 logger = logging.getLogger("moretta")
 access_logger = logging.getLogger("moretta.access")
 
-app = FastAPI(
-    title="Moretta",
-    description="Self-hosted AI proxy with PII anonymization",
-    version="0.8",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if not settings.vault_encryption_key:
+    logger.critical(
+        "VAULT_ENCRYPTION_KEY is not set — PII mappings, document text and chat "
+        "history will be stored UNENCRYPTED. Set it before handling real data."
+    )
 
 # ── State stores (persistent — survive restarts) ───────────────────
 
+# Both stores hold plaintext document text and reinjected AI output, so both
+# get the encryption key — not just the one holding binary blobs.
 file_store = PersistentStore(
     "files",
-    database_backend=settings.database_backend,
-    database_url=settings.database_url,
     sqlite_path=settings.store_db_path,
     encryption_key=settings.vault_encryption_key,
 )
 task_store = PersistentStore(
     "tasks",
-    database_backend=settings.database_backend,
-    database_url=settings.database_url,
     sqlite_path=settings.store_db_path,
+    encryption_key=settings.vault_encryption_key,
 )
 
 vault = Vault(
-    database_backend=settings.database_backend,
-    database_url=settings.database_url,
     sqlite_path=settings.vault_path,
     encryption_key=settings.vault_encryption_key,
 )
 audit = AuditLogger(settings.audit_log_path)
-detector = PiiDetector(settings.ollama_url, settings.local_model)
+detector = PiiDetector(
+    settings.ollama_url,
+    settings.local_model,
+    deep_scan_chunk_chars=settings.deep_scan_max_chars,
+)
 guard = SecurityGuard(settings.ollama_url, settings.local_model)
 replacer = PiiReplacer()
 reinjektor = Reinjektor()
 
 # ── TTL cleanup ───────────────────────────────────────────────────
 
-SESSION_TTL_SECONDS = 3600  # 1 hour
+SESSION_TTL_SECONDS = settings.session_ttl_seconds
+TASK_RETENTION_SECONDS = settings.task_retention_seconds
+CLEANUP_INTERVAL_SECONDS = 600
+
+# How many recent audit entries the dashboard aggregates. The log is append-only
+# and unrotated, so this must stay bounded.
+DASHBOARD_AUDIT_WINDOW = 10_000
+
+# Heavy fields dropped from a task once its context expires: keeping the
+# document body and rendered result in memory forever is what made long-running
+# instances grow without bound.
+EXPIRED_TASK_FIELDS = {"anonymized_text", "solution_text", "result_preview"}
+
 
 async def _cleanup_expired_sessions():
-    """Periodically remove sessions older than SESSION_TTL_SECONDS."""
+    """Periodically expire stale sessions and purge long-dead conversations."""
     while True:
-        await asyncio.sleep(600)  # Check every 10 minutes
-        expired_files = file_store.cleanup_older_than(SESSION_TTL_SECONDS, "uploaded_at")
-        expired_task_contexts = _expired_task_context_ids(SESSION_TTL_SECONDS)
-        for tid in expired_task_contexts:
-            vault.delete_session(tid)
-            if tid in task_store:
-                task_store[tid]["context_expired"] = True
-                task_store.persist(tid)
-        if expired_files or expired_task_contexts:
-            logger.info(
-                f"TTL cleanup: removed {len(expired_files)} files and expired {len(expired_task_contexts)} task contexts"
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        try:
+            expired_files = file_store.cleanup_older_than(SESSION_TTL_SECONDS, "uploaded_at")
+            expired_task_contexts = _expired_task_context_ids(SESSION_TTL_SECONDS)
+            for tid in expired_task_contexts:
+                vault.delete_session(tid)
+                if tid in task_store:
+                    task_store[tid]["context_expired"] = True
+                    task_store.persist(tid)
+                    task_store.drop_fields(tid, EXPIRED_TASK_FIELDS)
+
+            vault.cleanup_expired()
+            purged_tasks = task_store.cleanup_older_than(
+                TASK_RETENTION_SECONDS, "last_activity_at"
             )
+            for tid in purged_tasks:
+                vault.delete_session(tid)
+
+            if expired_files or expired_task_contexts or purged_tasks:
+                logger.info(
+                    "TTL cleanup: removed %s files, expired %s task contexts, "
+                    "purged %s conversations",
+                    len(expired_files),
+                    len(expired_task_contexts),
+                    len(purged_tasks),
+                )
+        except Exception:
+            # A failure here must not kill the loop, or nothing ever expires again.
+            logger.exception("TTL cleanup iteration failed")
+
 
 auth_validator = OIDCValidator(
     AuthConfig(
         issuer_url=settings.sso_issuer_url,
-        allowed_client_ids=[
-            client_id.strip()
-            for client_id in settings.sso_allowed_client_ids.split(",")
-            if client_id.strip()
-        ],
+        allowed_client_ids=settings.allowed_client_id_list,
+        admin_roles=settings.admin_role_list,
     )
 )
 
 
 # ── Helpers ────────────────────────────────────────────────────────
 
-SUPPORTED_EXTENSIONS = {".docx", ".xlsx", ".pdf", ".eml", ".msg"}
+SUPPORTED_EXTENSIONS = {".docx", ".xlsx", ".pdf", ".eml", ".msg", ".txt"}
+
+# Endpoints reachable without a bearer token. Must never expose user data.
+PUBLIC_API_PATHS = {"/api/health"}
 
 
 def _parse_file(path: Path, ext: str) -> dict[str, Any]:
@@ -141,6 +165,8 @@ def _parse_file(path: Path, ext: str) -> dict[str, Any]:
         return parse_pdf(path)
     elif ext in (".eml", ".msg"):
         return parse_email(path)
+    elif ext == ".txt":
+        return parse_txt(path)
     raise ValueError(f"Unsupported file extension: {ext}")
 
 
@@ -199,9 +225,27 @@ def _require_owned_task(request: Request, task_id: str) -> dict[str, Any]:
 
 
 def _resolve_model(provider_name: str, model_id: str | None) -> str:
-    """Return requested model or the provider default when omitted."""
+    """
+    Return the requested model, or the provider default when omitted.
+
+    The model id is checked against the registry so an arbitrary string cannot
+    be forwarded to a provider API.
+    """
+    default_model = get_default_model(provider_name)
+    if not default_model:
+        raise HTTPException(status_code=400, detail=f"Unknown provider '{provider_name}'")
+
     requested = (model_id or "").strip()
-    return requested or get_default_model(provider_name)
+    if not requested:
+        return default_model
+
+    known_models = {model["id"] for model in get_models_for_provider(provider_name)}
+    if requested not in known_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{requested}' is not available for provider '{provider_name}'",
+        )
+    return requested
 
 
 def _new_message(
@@ -260,11 +304,38 @@ def _conversation_summary(task_id: str, task: dict[str, Any]) -> dict[str, Any]:
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract real client IP, respecting X-Forwarded-For from reverse proxy."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """
+    Extract the client IP for the audit trail.
+
+    X-Forwarded-For is only honoured when TRUST_PROXY_HEADERS is enabled. When
+    the backend port is reachable directly, an attacker could otherwise forge
+    any address in the security log.
+    """
+    if settings.trust_proxy_headers:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+def _require_admin(request: Request) -> str:
+    """Ensure the caller holds an admin role before exposing instance-wide data."""
+    if not settings.sso_enabled:
+        return _get_user(request)
+
+    payload = getattr(request.state, "user", None)
+    if not isinstance(payload, dict) or not auth_validator.is_admin(payload):
+        audit.log(
+            event="authz_denied",
+            user=_get_user(request),
+            path=request.url.path,
+            required_roles=settings.admin_role_list,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator role required for this resource",
+        )
+    return _get_user(request)
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -314,16 +385,58 @@ def _expired_task_context_ids(seconds: int) -> list[str]:
 
 # ── Startup / Shutdown ─────────────────────────────────────────────
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Ensure required directories exist."""
+# Holds a strong reference to the cleanup task. Without it the event loop only
+# keeps a weak reference and the task can be garbage collected mid-flight.
+_background_tasks: set[asyncio.Task] = set()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Initialize storage and start the TTL cleanup loop."""
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
     file_store.initialize()
     task_store.initialize()
     vault.initialize()
-    asyncio.create_task(_cleanup_expired_sessions())
-    logger.info(f"Moretta backend v0.8 started ({len(file_store)} files, {len(task_store)} tasks restored)")
+
+    cleanup_task = asyncio.create_task(_cleanup_expired_sessions())
+    _background_tasks.add(cleanup_task)
+    cleanup_task.add_done_callback(_background_tasks.discard)
+
+    logger.info(
+        "Moretta backend v%s started (%s files, %s tasks restored)",
+        APP_VERSION,
+        len(file_store),
+        len(task_store),
+    )
+    try:
+        yield
+    finally:
+        for task in list(_background_tasks):
+            task.cancel()
+        logger.info("Moretta backend stopped")
+
+
+app = FastAPI(
+    title="Moretta",
+    description="Self-hosted AI proxy with PII anonymization",
+    version=APP_VERSION,
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+
+@app.get("/api/health")
+async def health() -> dict:
+    """Liveness probe. Intentionally unauthenticated and free of any user data."""
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.middleware("http")
@@ -352,7 +465,11 @@ async def require_sso_token(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    if settings.sso_enabled and request.url.path.startswith("/api/"):
+    if (
+        settings.sso_enabled
+        and request.url.path.startswith("/api/")
+        and request.url.path not in PUBLIC_API_PATHS
+    ):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             audit.log(
@@ -381,18 +498,58 @@ async def require_sso_token(request: Request, call_next):
 
 # ── Endpoints ──────────────────────────────────────────────────────
 
+async def _read_upload_limited(file: UploadFile) -> bytes:
+    """
+    Read an upload in chunks, refusing anything over MAX_UPLOAD_BYTES.
+
+    `UploadFile.read()` with no argument buffers the whole body in memory, so an
+    unbounded upload is a trivial way to exhaust the container.
+    """
+    limit = settings.max_upload_bytes
+    chunks: list[bytes] = []
+    total = 0
+
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds the maximum size of {limit // (1024 * 1024)} MB",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 async def _run_deep_scan(file_id: str, text: str, existing_pii: list[dict[str, Any]]):
-    """Background task to run Ollama Deep Scan and update the file store."""
+    """
+    Background task to run Ollama Deep Scan and update the file store.
+
+    `deep_scan_completed` is set in a finally block: if the scan fails we must
+    still unblock task creation, but `deep_scan_failed` records that contextual
+    detection did not actually run.
+    """
+    scan_failed = False
     try:
         new_pii = await detector.detect_deep_async(text, existing_pii)
+        if file_id in file_store and new_pii:
+            file_store[file_id]["pii"].extend(new_pii)
+            logger.info(
+                "Deep scan finished for %s, added %s new PII elements.",
+                file_id,
+                len(new_pii),
+            )
+    except Exception as exc:
+        scan_failed = True
+        logger.error(f"Deep scan background task failed: {_sanitize_error(str(exc))}")
+    finally:
         if file_id in file_store:
             file_store[file_id]["deep_scan_completed"] = True
-            if new_pii:
-                file_store[file_id]["pii"].extend(new_pii)
-                logger.info(f"Deep scan finished for {file_id}, added {len(new_pii)} new PII elements.")
+            file_store[file_id]["deep_scan_failed"] = scan_failed
             file_store.persist(file_id)
-    except Exception as exc:
-        logger.error(f"Deep scan background task failed: {exc}")
 
 
 @app.post("/api/upload")
@@ -407,8 +564,9 @@ async def upload_file(request: Request, file: UploadFile = File(...), background
             detail=f"Unsupported file type '{ext}'. Supported: {', '.join(SUPPORTED_EXTENSIONS)}",
         )
 
+    contents = await _read_upload_limited(file)
+
     file_id = str(uuid.uuid4())
-    contents = await file.read()
     save_path = settings.upload_dir / f"{file_id}{ext}"
     save_path.write_bytes(contents)
 
@@ -466,7 +624,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), background
 
 
 class TextInputRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=get_settings().max_text_chars)
 
 
 @app.post("/api/text")
@@ -568,6 +726,7 @@ async def get_pii(request: Request, file_id: str) -> dict:
         "filename": info["filename"],
         "total_pii": len(pii_list),
         "deep_scan_completed": info.get("deep_scan_completed", True),
+        "deep_scan_failed": bool(info.get("deep_scan_failed", False)),
         "types": sorted(type_details, key=lambda x: {"critical": 0, "warning": 1, "info": 2}[x["severity"]]),
     }
 
@@ -590,22 +749,18 @@ async def get_preview(request: Request, file_id: str) -> dict:
     # Anonymize structured preview data
     preview_data = info.get("preview_data", {})
     if preview_data.get("type") == "spreadsheet":
-        # Process each sheet and row
+        # One compiled pattern for the whole sheet. The previous version looped
+        # over every token for every cell, which is quadratic on large sheets.
+        masking_pattern = build_masking_pattern(list(token_map.values()))
         new_sheets = []
         for sheet in preview_data.get("sheets", []):
-            new_rows = []
-            for row in sheet.get("rows", []):
-                new_row = []
-                for cell in row:
-                    cell_str = str(cell)
-                    # Simple replacement using the token map
-                    # (Note: this is a heuristic, but works since tokens are unique)
-                    masked_cell = cell_str
-                    for token, original in token_map.items():
-                        if original in masked_cell:
-                            masked_cell = masked_cell.replace(original, token)
-                    new_row.append(masked_cell)
-                new_rows.append(new_row)
+            new_rows = [
+                [
+                    mask_with_token_map(str(cell), token_map, pattern=masking_pattern)
+                    for cell in row
+                ]
+                for row in sheet.get("rows", [])
+            ]
             new_sheets.append({"name": sheet["name"], "rows": new_rows})
         preview_data = {"type": "spreadsheet", "sheets": new_sheets}
     else:
@@ -624,24 +779,39 @@ async def get_preview(request: Request, file_id: str) -> dict:
     }
 
 
+class TaskRequest(BaseModel):
+    file_id: str
+    instruction: str = Field(min_length=1, max_length=20_000)
+    provider: str | None = None
+    model: str | None = None
+
+
 @app.post("/api/task")
 async def create_task(
     request: Request,
-    body: dict,
+    body: TaskRequest,
     background_tasks: BackgroundTasks,
 ) -> dict:
-    """Create an AI processing task. Body: {file_id, instruction, provider?, model?}."""
-    file_id = body.get("file_id")
-    instruction = body.get("instruction", "")
-    provider_name = body.get("provider", settings.default_provider)
-    model_id = body.get("model")  # optional specific model
-    resolved_model = _resolve_model(provider_name, model_id)
-
-    if not file_id:
-        raise HTTPException(status_code=404, detail="File not found")
+    """Create an AI processing task."""
+    file_id = body.file_id
+    instruction = body.instruction
+    provider_name = body.provider or settings.default_provider
+    resolved_model = _resolve_model(provider_name, body.model)
 
     if not instruction.strip():
         raise HTTPException(status_code=400, detail="Instruction is required")
+
+    # Resolve ownership before spending a local-LLM call on the guard.
+    info = _require_owned_file(request, file_id)
+
+    # Contextual (business) PII is only found by the background deep scan.
+    # Starting a task before it finishes would ship an under-masked document to
+    # an external provider, so refuse instead of racing it.
+    if not info.get("deep_scan_completed", False):
+        raise HTTPException(
+            status_code=409,
+            detail="Deep scan is still running. Wait until PII detection completes.",
+        )
 
     # SECURITY GUARD (Prompt DLP) Check
     is_safe = await guard.check_instruction(instruction)
@@ -656,7 +826,6 @@ async def create_task(
             detail="Polityka Bezpieczeństwa (Security Guard): Instrukcja zawiera chronione dane wrażliwe (PII). Usuń je z okna czatu i polegaj tylko na maskowaniu treści dokumentu."
         )
 
-    info = _require_owned_file(request, file_id)
     task_id = str(uuid.uuid4())
 
     # Anonymize text
@@ -669,7 +838,7 @@ async def create_task(
         token_map.update(inst_token_map)
 
     # Store mapping in vault
-    vault.store_session(task_id, token_map)
+    vault.store_session(task_id, token_map, ttl_seconds=SESSION_TTL_SECONDS)
 
     user_identity = _get_user_identity(request)
     now = datetime.now(timezone.utc).isoformat()
@@ -778,15 +947,37 @@ async def chat_task(
         message_count=len(task["messages"]),
     )
 
-    # We need the token_map from the vault
-    token_map = vault.get_session(task_id)
+    # We need the token_map from the vault. Without it the conversation history
+    # (which holds reinjected plaintext PII) cannot be re-anonymized, so this
+    # must fail closed rather than proceed with an empty mapping.
+    try:
+        token_map = vault.get_session(task_id)
+    except VaultSessionError as exc:
+        logger.error("Vault unavailable for task %s: %s", task_id, exc)
+        audit.log(
+            event="security_incident",
+            user=user,
+            session_id=task_id,
+            details="Vault mapping unavailable — chat refused to avoid plaintext leak",
+        )
+        task["status"] = "failed"
+        task["error"] = "PII mapping unavailable"
+        task["context_expired"] = True
+        task_store.persist(task_id)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Mapowanie PII dla tej rozmowy jest niedostępne. Ze względów "
+                "bezpieczeństwa nie można jej kontynuować — rozpocznij nową."
+            ),
+        ) from exc
 
     # Detect any NEW PII the user just typed and add to the token map
     new_pii_results = await detector.detect(instruction)
     if new_pii_results:
         _, new_token_map = replacer.anonymize(instruction, new_pii_results)
         token_map.update(new_token_map)
-        vault.store_session(task_id, token_map)
+        vault.store_session(task_id, token_map, ttl_seconds=SESSION_TTL_SECONDS)
 
     # Process in background
     background_tasks.add_task(
@@ -926,10 +1117,11 @@ async def get_audit_log(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
-    """Return audit log entries."""
+    """Return audit log entries. Administrators only — this is instance-wide data."""
+    user = _require_admin(request)
     audit.log(
         event="audit_log_viewed",
-        user=_get_user(request),
+        user=user,
         limit=limit,
         offset=offset,
     )
@@ -945,8 +1137,6 @@ async def get_audit_log(
 @app.get("/api/providers")
 async def get_providers() -> dict:
     """Return list of available AI providers with all model options."""
-    from providers.models_registry import get_models_for_provider, get_default_model
-
     provider_configs = [
         {"id": "claude",      "name": "Anthropic (Claude)",      "key": settings.anthropic_api_key},
         {"id": "openai",      "name": "OpenAI (GPT)",            "key": settings.openai_api_key},
@@ -970,7 +1160,14 @@ async def get_providers() -> dict:
     return {
         "providers": providers,
         "default_provider": settings.default_provider,
-        "default_model": settings.default_ai_model,
+        # Fall back to the registry so a stale DEFAULT_AI_MODEL in .env can never
+        # advertise a model id that no provider actually accepts.
+        "default_model": (
+            settings.default_ai_model
+            if settings.default_ai_model
+            in {m["id"] for m in get_models_for_provider(settings.default_provider)}
+            else get_default_model(settings.default_provider)
+        ),
     }
 
 
@@ -1036,11 +1233,16 @@ async def get_conversation(request: Request, conversation_id: str) -> dict:
 
 
 @app.get("/api/dashboard")
-async def get_dashboard() -> dict:
-    """Aggregate audit data into dashboard statistics."""
+async def get_dashboard(request: Request) -> dict:
+    """
+    Aggregate audit data into dashboard statistics.
+
+    Administrators only: these numbers cover every user of the instance.
+    """
+    _require_admin(request)
     from collections import Counter, defaultdict
 
-    entries = audit.read(limit=10000, offset=0)
+    entries = audit.read_tail(limit=DASHBOARD_AUDIT_WINDOW)
 
     total_files = 0
     total_tasks = 0
@@ -1123,17 +1325,28 @@ async def _process_task(
         # User messages might contain PII that was manually typed.
         # Assistant messages were reinjected with real PII after the last response.
         # We must replace real PII back with tokens before sending the history.
-        reverse_map = {v: k for k, v in token_map.items()}  # original_value → token
-        # Sort keys by length descending to replace longest PII first (e.g., "Jan Kowalski" before "Jan")
-        keys_sorted = sorted(reverse_map.keys(), key=len, reverse=True)
+        #
+        # Refuse outright if the task masked something but we hold no mapping:
+        # sending the history verbatim would leak every reinjected value.
+        expected_tokens = task_store[task_id].get("pii_masked", 0)
+        if expected_tokens and not token_map:
+            raise ValueError(
+                "PII mapping is unavailable for this task; refusing to send history"
+            )
+
+        # One compiled pattern for the whole history: matching is case-insensitive
+        # and tolerates Polish declension, because a miss here is a plaintext leak.
+        masking_pattern = build_masking_pattern(
+            list(token_map.values()), allow_inflection=True
+        )
 
         safe_messages = []
         for msg in messages:
             content = msg["content"]
             if isinstance(content, str):
-                for original_value in keys_sorted:
-                    if original_value in content:
-                        content = content.replace(original_value, reverse_map[original_value])
+                content = mask_with_token_map(
+                    content, token_map, pattern=masking_pattern
+                )
             safe_messages.append({"role": msg["role"], "content": content})
 
         ai_response = await provider.process(anonymized_text, safe_messages)

@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.update({
     "SSO_ENABLED": "false",
     "DATA_DIR": tempfile.mkdtemp(prefix="moretta_test_"),
-    "DATABASE_BACKEND": "sqlite",
+    # Exercise the encrypted-at-rest path that production runs with.
+    "VAULT_ENCRYPTION_KEY": "test-encryption-key",
     "OLLAMA_URL": "http://localhost:11434",
     "LOCAL_MODEL": "phi4-mini",
     "LOG_LEVEL": "WARNING",

@@ -4,7 +4,6 @@ Tests the critical path: upload → PII detection → task → result → downlo
 Also tests the persistent store, dashboard, and audit logging.
 """
 
-import json
 from pathlib import Path
 
 import pytest
@@ -19,7 +18,7 @@ class TestPersistentStore:
     def test_store_basic_crud(self, tmp_path: Path):
         from store import PersistentStore
 
-        store = PersistentStore("items", database_backend="sqlite", sqlite_path=tmp_path / "test.db")
+        store = PersistentStore("items", sqlite_path=tmp_path / "test.db")
         store.initialize()
 
         store["key1"] = {"name": "test", "value": 42}
@@ -37,13 +36,13 @@ class TestPersistentStore:
         db_path = tmp_path / "persist.db"
 
         # Write with first instance
-        store1 = PersistentStore("data", database_backend="sqlite", sqlite_path=db_path)
+        store1 = PersistentStore("data", sqlite_path=db_path)
         store1.initialize()
         store1["session1"] = {"status": "active", "count": 5}
         store1["session2"] = {"status": "done", "count": 10}
 
         # Read with new instance (simulates restart)
-        store2 = PersistentStore("data", database_backend="sqlite", sqlite_path=db_path)
+        store2 = PersistentStore("data", sqlite_path=db_path)
         store2.initialize()
         assert "session1" in store2
         assert store2["session1"]["status"] == "active"
@@ -54,7 +53,7 @@ class TestPersistentStore:
         from store import PersistentStore
 
         db_path = tmp_path / "blob.db"
-        store = PersistentStore("files", database_backend="sqlite", sqlite_path=db_path)
+        store = PersistentStore("files", sqlite_path=db_path)
         store.initialize()
 
         test_bytes = b"Hello, binary world! \x00\xff\xfe"
@@ -64,7 +63,7 @@ class TestPersistentStore:
         assert store["file1"]["original_bytes"] == test_bytes
 
         # Verify blob survives reload
-        store2 = PersistentStore("files", database_backend="sqlite", sqlite_path=db_path)
+        store2 = PersistentStore("files", sqlite_path=db_path)
         store2.initialize()
         assert store2["file1"]["original_bytes"] == test_bytes
 
@@ -72,7 +71,7 @@ class TestPersistentStore:
         from store import PersistentStore
 
         db_path = tmp_path / "mutate.db"
-        store = PersistentStore("tasks", database_backend="sqlite", sqlite_path=db_path)
+        store = PersistentStore("tasks", sqlite_path=db_path)
         store.initialize()
 
         store["task1"] = {"status": "processing", "messages": []}
@@ -81,16 +80,76 @@ class TestPersistentStore:
         store.persist("task1")
 
         # Reload and verify
-        store2 = PersistentStore("tasks", database_backend="sqlite", sqlite_path=db_path)
+        store2 = PersistentStore("tasks", sqlite_path=db_path)
         store2.initialize()
         assert store2["task1"]["status"] == "completed"
         assert len(store2["task1"]["messages"]) == 1
+
+    def test_store_encrypts_payload_at_rest(self, tmp_path: Path):
+        """Document text and chat history must not be readable in the DB file."""
+        import sqlite3
+        from store import PersistentStore
+
+        db_path = tmp_path / "encrypted.db"
+        store = PersistentStore(
+            "tasks", sqlite_path=db_path, encryption_key="unit-test-key"
+        )
+        store.initialize()
+        store["t1"] = {
+            "text": "Jan Kowalski, PESEL 92010212345",
+            "messages": [{"role": "assistant", "content": "Umowa dla Jan Kowalski"}],
+        }
+
+        raw = sqlite3.connect(db_path).execute(
+            "SELECT value FROM tasks WHERE key = 't1'"
+        ).fetchone()[0]
+        assert "Jan Kowalski" not in raw
+        assert "92010212345" not in raw
+
+        # Still readable through the store itself.
+        reopened = PersistentStore(
+            "tasks", sqlite_path=db_path, encryption_key="unit-test-key"
+        )
+        reopened.initialize()
+        assert reopened["t1"]["text"] == "Jan Kowalski, PESEL 92010212345"
+
+    def test_store_reads_legacy_plaintext_rows(self, tmp_path: Path):
+        """A database written before encryption was enabled must still load."""
+        from store import PersistentStore
+
+        db_path = tmp_path / "legacy.db"
+        legacy = PersistentStore("files", sqlite_path=db_path)  # no key
+        legacy.initialize()
+        legacy["old"] = {"filename": "a.docx", "text": "plain"}
+
+        upgraded = PersistentStore(
+            "files", sqlite_path=db_path, encryption_key="new-key"
+        )
+        upgraded.initialize()
+        assert upgraded["old"]["text"] == "plain"
+
+    def test_store_drop_fields(self, tmp_path: Path):
+        from store import PersistentStore
+
+        db_path = tmp_path / "drop.db"
+        store = PersistentStore("tasks", sqlite_path=db_path, encryption_key="k")
+        store.initialize()
+        store["t1"] = {"status": "done", "solution_text": "big", "keep": 1}
+
+        store.drop_fields("t1", {"solution_text"})
+
+        assert "solution_text" not in store["t1"]
+        assert store["t1"]["keep"] == 1
+
+        reopened = PersistentStore("tasks", sqlite_path=db_path, encryption_key="k")
+        reopened.initialize()
+        assert "solution_text" not in reopened["t1"]
 
     def test_store_cleanup(self, tmp_path: Path):
         from store import PersistentStore
         from datetime import datetime, timezone, timedelta
 
-        store = PersistentStore("sessions", database_backend="sqlite", sqlite_path=tmp_path / "ttl.db")
+        store = PersistentStore("sessions", sqlite_path=tmp_path / "ttl.db")
         store.initialize()
 
         old_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
@@ -112,7 +171,6 @@ class TestVault:
         from anonymizer.vault import Vault
 
         vault = Vault(
-            database_backend="sqlite",
             sqlite_path=tmp_path / "vault.db",
             encryption_key="test-secret",
         )
@@ -125,19 +183,60 @@ class TestVault:
         assert restored == token_map
 
     def test_vault_delete_session(self, tmp_path: Path):
-        from anonymizer.vault import Vault
+        from anonymizer.vault import Vault, VaultSessionError
 
         vault = Vault(
-            database_backend="sqlite",
             sqlite_path=tmp_path / "vault.db",
             encryption_key="test-secret",
         )
         vault.initialize()
         vault.store_session("session-1", {"<UUID_1>": "Jan Kowalski"})
+        assert vault.has_session("session-1")
 
         vault.delete_session("session-1")
 
-        assert vault.get_session("session-1") == {}
+        # Must fail closed: an empty mapping would silently disable
+        # re-anonymization of the conversation history.
+        assert not vault.has_session("session-1")
+        with pytest.raises(VaultSessionError):
+            vault.get_session("session-1")
+
+    def test_vault_missing_session_raises(self, tmp_path: Path):
+        from anonymizer.vault import Vault, VaultSessionError
+
+        vault = Vault(sqlite_path=tmp_path / "vault.db", encryption_key="k")
+        vault.initialize()
+
+        with pytest.raises(VaultSessionError):
+            vault.get_session("never-stored")
+
+    def test_vault_wrong_key_raises_instead_of_empty(self, tmp_path: Path):
+        from anonymizer.vault import Vault, VaultSessionError
+
+        db = tmp_path / "vault.db"
+        writer = Vault(sqlite_path=db, encryption_key="original-key")
+        writer.initialize()
+        writer.store_session("s1", {"<T1>": "Jan Kowalski"})
+
+        reader = Vault(sqlite_path=db, encryption_key="rotated-key")
+        reader.initialize()
+        with pytest.raises(VaultSessionError):
+            reader.get_session("s1")
+
+    def test_vault_expiry_cleanup(self, tmp_path: Path):
+        from anonymizer.vault import Vault, VaultSessionError
+
+        vault = Vault(sqlite_path=tmp_path / "vault.db", encryption_key="k")
+        vault.initialize()
+        vault.store_session("expired", {"<T1>": "x"}, ttl_seconds=-1)
+        vault.store_session("fresh", {"<T2>": "y"}, ttl_seconds=3600)
+
+        removed = vault.cleanup_expired()
+
+        assert removed == 1
+        assert vault.get_session("fresh") == {"<T2>": "y"}
+        with pytest.raises(VaultSessionError):
+            vault.get_session("expired")
 
 
 # ── API Tests ──────────────────────────────────────────────────────
@@ -145,6 +244,19 @@ class TestVault:
 
 class TestHealthAndProviders:
     """Test basic API endpoints."""
+
+    def test_health_endpoint_is_public(self, client):
+        res = client.get("/api/health")
+        assert res.status_code == 200
+        assert res.json()["status"] == "ok"
+
+    def test_providers_default_model_is_a_real_model(self, client):
+        """A stale DEFAULT_AI_MODEL must never be advertised to the UI."""
+        data = client.get("/api/providers").json()
+        by_id = {p["id"]: p for p in data["providers"]}
+        default_provider = data["default_provider"]
+        valid_ids = {m["id"] for m in by_id[default_provider]["models"]}
+        assert data["default_model"] in valid_ids
 
     def test_providers_endpoint(self, client):
         res = client.get("/api/providers")
@@ -288,6 +400,70 @@ class TestTaskFlow:
             json={"instruction": "Continue"},
         )
         assert res.status_code == 404
+
+    def test_task_rejects_unknown_model(self, client, sample_text: str):
+        file_id = client.post("/api/text", json={"text": sample_text}).json()["file_id"]
+
+        res = client.post(
+            "/api/task",
+            json={
+                "file_id": file_id,
+                "instruction": "Popraw tekst",
+                "provider": "claude",
+                "model": "definitely-not-a-real-model",
+            },
+        )
+        assert res.status_code == 400
+        assert "not available" in res.json()["detail"]
+
+    def test_task_blocked_while_deep_scan_pending(self, client, sample_text: str):
+        """Sending a document before contextual detection finishes must be refused."""
+        from main import file_store
+
+        file_id = client.post("/api/text", json={"text": sample_text}).json()["file_id"]
+        # Simulate the scan still running (background task already completed here).
+        file_store[file_id]["deep_scan_completed"] = False
+        file_store.persist(file_id)
+
+        res = client.post(
+            "/api/task",
+            json={"file_id": file_id, "instruction": "Popraw tekst"},
+        )
+        assert res.status_code == 409
+        assert "Deep scan" in res.json()["detail"]
+
+
+class TestInputLimits:
+    """Uploads and raw text must be bounded."""
+
+    def test_text_over_limit_rejected(self, client):
+        from config import get_settings
+
+        oversized = "a" * (get_settings().max_text_chars + 1)
+        res = client.post("/api/text", json={"text": oversized})
+        assert res.status_code == 422
+
+    def test_upload_over_limit_rejected(self, client, tmp_path: Path, monkeypatch):
+        import main
+
+        monkeypatch.setattr(main.settings, "max_upload_bytes", 1024)
+
+        big = tmp_path / "big.txt"
+        big.write_bytes(b"x" * 4096)
+        with open(big, "rb") as f:
+            res = client.post("/api/upload", files={"file": ("big.txt", f)})
+
+        assert res.status_code == 413
+
+    def test_txt_upload_supported(self, client, tmp_path: Path):
+        """The UI offers .txt, so the backend must accept it."""
+        txt = tmp_path / "notatka.txt"
+        txt.write_text("Jan Kowalski, PESEL 92010212345", encoding="utf-8")
+        with open(txt, "rb") as f:
+            res = client.post("/api/upload", files={"file": ("notatka.txt", f)})
+
+        assert res.status_code == 200
+        assert res.json()["filename"].endswith(".txt")
 
 
 # ── Audit Log Tests ────────────────────────────────────────────────

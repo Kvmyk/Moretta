@@ -79,3 +79,7 @@ uploads/
 *.db
 logs/
 *.log
+
+# Katalogi tymczasowe pytest
+.pytest_tmp/
+.pytest_cache/

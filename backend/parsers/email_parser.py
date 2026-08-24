@@ -9,7 +9,7 @@ import email
 import email.policy
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 logger = logging.getLogger("moretta.parsers.email")
 
